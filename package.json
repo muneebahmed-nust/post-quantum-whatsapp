@@ -1,0 +1,20 @@
+{
+  "name": "post-quantum-whatsapp",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "devDependencies": {
+    "esbuild": "^0.27.0"
+  },
+  "dependencies": {
+    "mlkem": "^2.5.0",
+    "socket.io-client": "^4.8.1"
+  }
+}
