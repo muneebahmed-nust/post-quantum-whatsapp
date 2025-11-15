@@ -1,6 +1,12 @@
+# Flask web framework - lightweight WSGI web application framework for Python
 Flask==3.0.3
+# Flask-SocketIO - WebSocket integration for Flask, enables real-time bidirectional communication
 Flask-SocketIO==5.3.6
+# python-socketio - Python implementation of Socket.IO server (used by Flask-SocketIO)
 python-socketio==5.14.3
+# python-engineio - Engine.IO server implementation (underlying protocol for Socket.IO)
 python-engineio==4.12.3
+# pyOpenSSL - Python wrapper for OpenSSL, used to generate self-signed SSL certificates for HTTPS
 pyOpenSSL==25.3.0
+# eventlet - Concurrent networking library, provides asynchronous I/O for Flask-SocketIO
 eventlet==0.36.1
