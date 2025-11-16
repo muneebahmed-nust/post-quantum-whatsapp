@@ -19,6 +19,7 @@ class SecureChannelManager {
         console.log('✅ ML-KEM-512 instance created');
         this.publicKey = null;
         this.privateKey = null;
+        this.publicKeyCache = new Map(); // Store other users' public keys
         this.keyPairReady = this.generateNewKeyPair();
         console.log('⏳ Key pair generation started...');
     }
@@ -41,7 +42,12 @@ class SecureChannelManager {
     
 
 arrayBufferToBase64(buf) {
-    return btoa(String.fromCharCode(...new Uint8Array(buf)));
+    const bytes = new Uint8Array(buf);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+        binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
 }
 
     // generate a new key pair for secure communication
@@ -87,6 +93,24 @@ arrayBufferToBase64(buf) {
          * @returns {Uint8Array} - The decoded binary data as a Uint8Array.
          */
         return this.base64ToArrayBuffer(b64);
+    }
+
+    hasPublicKey(username) {
+        return this.publicKeyCache.has(username);
+    }
+
+    getUserPublicKey(username) {
+        return this.publicKeyCache.get(username);
+    }
+
+    storeUserPublicKey(username, publicKeyB64) {
+        try {
+            // Store the base64 version for easier use
+            this.publicKeyCache.set(username, publicKeyB64);
+            console.log(`🔑 Stored public key for ${username}`);
+        } catch (error) {
+            console.error(`❌ Failed to store public key for ${username}:`, error);
+        }
     }
 
     async generateCiphertextSharedSecret(publicKey) {
@@ -183,6 +207,148 @@ async  aesDecrypt(aesKey, iv, ciphertext) {
         const iv = this.base64ToArrayBuffer(ivB64);
         const ciphertext = this.base64ToArrayBuffer(ciphertextB64);
         return this.aesDecrypt(aesKey, iv, ciphertext);
+    }
+
+    /* ------------------ Group Encryption Methods ------------------ */
+
+    /**
+     * Generate AES-256 key for group encryption
+     */
+    async generateGroupKey() {
+        return await window.crypto.subtle.generateKey(
+            {
+                name: "AES-GCM",
+                length: 256
+            },
+            true, // extractable
+            ["encrypt", "decrypt"]
+        );
+    }
+
+    /**
+     * Encapsulate key using peer's ML-KEM public key
+     * Returns ciphertext and shared secret
+     */
+    async encapsulateKey(publicKeyB64) {
+        const publicKey = this.base64ToArrayBuffer(publicKeyB64);
+        const result = await this.kem.encap(publicKey);
+        
+        if (Array.isArray(result)) {
+            const [ciphertext, sharedSecret] = result;
+            return { ciphertext, sharedSecret };
+        }
+        return result;
+    }
+
+    /**
+     * Decapsulate using own ML-KEM private key
+     * Returns shared secret
+     */
+    async decapsulateKey(ciphertextB64) {
+        const ciphertext = this.base64ToArrayBuffer(ciphertextB64);
+        const sharedSecret = await this.kem.decap(ciphertext, this.privateKey);
+        return sharedSecret;
+    }
+
+    /**
+     * Encrypt data with shared secret (from KEM)
+     */
+    async encryptWithSharedSecret(data, sharedSecret) {
+        // Import shared secret as AES key
+        const key = await window.crypto.subtle.importKey(
+            "raw",
+            sharedSecret,
+            { name: "AES-GCM", length: 256 },
+            false,
+            ["encrypt"]
+        );
+
+        const iv = window.crypto.getRandomValues(new Uint8Array(12));
+        const ciphertext = await window.crypto.subtle.encrypt(
+            { name: "AES-GCM", iv },
+            key,
+            data
+        );
+
+        return this.combineArrays(iv, new Uint8Array(ciphertext));
+    }
+
+    /**
+     * Decrypt data with shared secret
+     */
+    async decryptWithSharedSecret(encryptedData, sharedSecret) {
+        // Import shared secret as AES key
+        const key = await window.crypto.subtle.importKey(
+            "raw",
+            sharedSecret,
+            { name: "AES-GCM", length: 256 },
+            false,
+            ["decrypt"]
+        );
+
+        const iv = encryptedData.slice(0, 12);
+        const ciphertext = encryptedData.slice(12);
+
+        const plaintext = await window.crypto.subtle.decrypt(
+            { name: "AES-GCM", iv },
+            key,
+            ciphertext
+        );
+
+        return new Uint8Array(plaintext);
+    }
+
+    /**
+     * Encrypt message/data with group AES key
+     */
+    async encryptGroupMessage(data, groupKey) {
+        const dataBytes = typeof data === 'string' 
+            ? new TextEncoder().encode(data)
+            : data;
+
+        const iv = window.crypto.getRandomValues(new Uint8Array(12));
+
+        const ciphertext = await window.crypto.subtle.encrypt(
+            { name: "AES-GCM", iv },
+            groupKey,
+            dataBytes
+        );
+
+        const combined = this.combineArrays(iv, new Uint8Array(ciphertext));
+        return this.arrayBufferToBase64(combined);
+    }
+
+    /**
+     * Decrypt message/data with group AES key
+     */
+    async decryptGroupMessage(encryptedDataB64, groupKey) {
+        const combined = this.base64ToArrayBuffer(encryptedDataB64);
+        
+        const iv = combined.slice(0, 12);
+        const ciphertext = combined.slice(12);
+
+        const plaintext = await window.crypto.subtle.decrypt(
+            { name: "AES-GCM", iv },
+            groupKey,
+            ciphertext
+        );
+
+        // Return as string if it's valid UTF-8, otherwise as bytes
+        try {
+            return new TextDecoder().decode(plaintext);
+        } catch {
+            return new Uint8Array(plaintext);
+        }
+    }
+
+    /**
+     * Combine two Uint8Arrays
+     */
+    combineArrays(a, b) {
+        const combined = new Uint8Array(a.length + b.length);
+        combined.set(a, 0);
+        combined.set(b, a.length);
+        return combined;
     }
 
 }

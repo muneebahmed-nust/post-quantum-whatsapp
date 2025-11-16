@@ -2,13 +2,15 @@
 from flask import Flask, render_template, request
 # Import SocketIO for real-time bidirectional communication between clients and server
 from flask_socketio import SocketIO, emit
+# Import group management classes
+from group import Group, GroupManager
 
 # Initialize Flask application instance
 app = Flask(__name__)
 # Set secret key for session management and security (should be changed in production)
 app.config['SECRET_KEY'] = 'secret!'
 # Initialize SocketIO with CORS enabled to allow connections from any origin
-socketio = SocketIO(app, cors_allowed_origins="*")
+socketio = SocketIO(app, cors_allowed_origins="*", max_http_buffer_size=10**7)  # 10MB for images
 
 # Dictionary to store connected clients' information
 # Structure: {socket_id: {"name": username, "pubkey": base64_encoded_public_key}}
@@ -16,6 +18,9 @@ clients = {}  # sid -> {"name": name, "pubkey": None}
 
 # Dictionary to map usernames to socket IDs for easy lookup
 username_to_sid = {}  # username -> sid
+
+# Initialize group manager
+group_manager = GroupManager()
 
 # Route handler for the root URL - serves the main chat interface
 @app.route("/")
@@ -182,6 +187,146 @@ def on_send_message(data):
         # Log warning if target is unavailable
         print(f"⚠️ Target SID {target_sid} not found!")
         print(f"   Available SIDs: {list(clients.keys())}")
+
+# WebSocket event handler for creating a group chat
+@socketio.on("create_group")
+def on_create_group(data):
+    """
+    Handle group creation request from admin.
+    Admin must ensure they have public keys of all members before creating group.
+    """
+    group_name = data.get("name")
+    member_names = data.get("members", [])  # List of usernames
+    admin_name = clients.get(request.sid, {}).get("name")
+    
+    if not admin_name:
+        emit("group_error", {"message": "You must be registered to create a group"}, to=request.sid)
+        return
+    
+    if not group_name or not member_names:
+        emit("group_error", {"message": "Group name and members required"}, to=request.sid)
+        return
+    
+    # Verify all members exist
+    missing_members = [m for m in member_names if m not in username_to_sid]
+    if missing_members:
+        emit("group_error", {"message": f"Members not found: {', '.join(missing_members)}"}, to=request.sid)
+        return
+    
+    # Create the group
+    group = group_manager.create_group(group_name, admin_name, member_names)
+    print(f"👥 Group created: {group_name} (ID: {group.group_id}) by {admin_name}")
+    print(f"   Members: {group.get_members()}")
+    
+    # Send group info to admin with group ID
+    emit("group_created", {
+        "group_id": group.group_id,
+        "name": group.name,
+        "admin": admin_name,
+        "members": group.get_members()
+    }, to=request.sid)
+    
+    # Notify all members about the new group
+    for member_name in group.get_members():
+        if member_name != admin_name:  # Admin already knows
+            member_sid = username_to_sid.get(member_name)
+            if member_sid:
+                emit("group_invitation", {
+                    "group_id": group.group_id,
+                    "name": group.name,
+                    "admin": admin_name,
+                    "members": group.get_members()
+                }, to=member_sid)
+
+# WebSocket event handler for distributing group encryption key
+@socketio.on("distribute_group_key")
+def on_distribute_group_key(data):
+    """
+    Admin distributes the AES-256 group key encrypted with each member's public key.
+    data: {
+        "group_id": str,
+        "encrypted_keys": {username: base64_encrypted_key, ...}
+    }
+    """
+    group_id = data.get("group_id")
+    encrypted_keys = data.get("encrypted_keys", {})
+    admin_name = clients.get(request.sid, {}).get("name")
+    
+    group = group_manager.get_group(group_id)
+    if not group:
+        emit("group_error", {"message": "Group not found"}, to=request.sid)
+        return
+    
+    if not group.is_admin(admin_name):
+        emit("group_error", {"message": "Only admin can distribute keys"}, to=request.sid)
+        return
+    
+    print(f"🔑 Distributing group keys for {group.name}")
+    
+    # Send encrypted key to each member
+    for member_name, encrypted_key in encrypted_keys.items():
+        if member_name in group.get_members():
+            member_sid = username_to_sid.get(member_name)
+            if member_sid:
+                emit("group_key", {
+                    "group_id": group_id,
+                    "group_name": group.name,
+                    "encrypted_key": encrypted_key
+                }, to=member_sid)
+                print(f"   ✅ Key sent to {member_name}")
+
+# WebSocket event handler for sending group messages
+@socketio.on("send_group_message")
+def on_send_group_message(data):
+    """
+    Forward encrypted group message to all members.
+    Message is encrypted with the shared group key.
+    """
+    group_id = data.get("group_id")
+    encrypted_message = data.get("encrypted_message")
+    sender_name = clients.get(request.sid, {}).get("name")
+    
+    group = group_manager.get_group(group_id)
+    if not group:
+        emit("group_error", {"message": "Group not found"}, to=request.sid)
+        return
+    
+    if not group.is_member(sender_name):
+        emit("group_error", {"message": "You are not a member of this group"}, to=request.sid)
+        return
+    
+    print(f"📨 Group message from {sender_name} to {group.name}")
+    
+    # Store message in group history
+    group.add_message({
+        "sender": sender_name,
+        "encrypted_message": encrypted_message,
+        "timestamp": __import__('time').time()
+    })
+    
+    # Forward to all members except sender
+    for member_name in group.get_members():
+        member_sid = username_to_sid.get(member_name)
+        if member_sid and member_sid != request.sid:  # Don't send back to sender
+            emit("recv_group_message", {
+                "group_id": group_id,
+                "group_name": group.name,
+                "sender": sender_name,
+                "encrypted_message": encrypted_message
+            }, to=member_sid)
+
+# WebSocket event handler for getting user's groups
+@socketio.on("get_my_groups")
+def on_get_my_groups():
+    """Return all groups the user is a member of"""
+    username = clients.get(request.sid, {}).get("name")
+    if not username:
+        return
+    
+    user_groups = group_manager.get_user_groups(username)
+    groups_data = [g.to_dict() for g in user_groups]
+    
+    emit("my_groups", {"groups": groups_data}, to=request.sid)
 
 # Main entry point - only runs when script is executed directly (not imported)
 if __name__ == "__main__":

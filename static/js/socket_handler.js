@@ -16,6 +16,11 @@ export class SocketHandler {
         this.messageListeners = [];
         this.pubKeyListeners = [];
         this.kemCiphertextListeners = [];
+        this.groupCreatedListeners = [];
+        this.groupInvitationListeners = [];
+        this.groupKeyListeners = [];
+        this.groupMessageListeners = [];
+        this.groupErrorListeners = [];
 
         this._setupSocketEvents();
     }
@@ -78,6 +83,32 @@ export class SocketHandler {
             console.log(`🔐 Received KEM ciphertext from ${from}`);
             // Emit this to kemCiphertextListeners
             this.kemCiphertextListeners.forEach(fn => fn(from, ciphertext));
+        });
+
+        // Group-related socket events
+        this.socket.on('group_created', (data) => {
+            console.log('📬 Group created:', data);
+            this.groupCreatedListeners.forEach(fn => fn(data));
+        });
+
+        this.socket.on('group_invitation', (data) => {
+            console.log('📬 Group invitation:', data);
+            this.groupInvitationListeners.forEach(fn => fn(data));
+        });
+
+        this.socket.on('group_key', (data) => {
+            console.log('🔑 Received encrypted group key for:', data.group_name);
+            this.groupKeyListeners.forEach(fn => fn(data));
+        });
+
+        this.socket.on('recv_group_message', (data) => {
+            // console.log('📨 Group message from:', data.sender, 'in', data.group_name);
+            this.groupMessageListeners.forEach(fn => fn(data));
+        });
+
+        this.socket.on('group_error', (data) => {
+            console.error('❌ Group error:', data.message);
+            this.groupErrorListeners.forEach(fn => fn(data));
         });
     }
 
@@ -151,5 +182,58 @@ sendKEMCiphertext(targetUserName, ciphertextB64) {
     /** Get current socket ID for a username */
     getSocketId(userName) {
         return this.users[userName] || null;
+    }
+
+    /* ------------------ Group Chat Methods ------------------ */
+
+    /** Create a new group */
+    createGroup(groupName, memberUsernames) {
+        this.socket.emit('create_group', {
+            name: groupName,
+            members: memberUsernames
+        });
+    }
+
+    /** Distribute encrypted group keys to members */
+    distributeGroupKey(groupId, encryptedKeys) {
+        this.socket.emit('distribute_group_key', {
+            group_id: groupId,
+            encrypted_keys: encryptedKeys
+        });
+    }
+
+    /** Send a message to a group */
+    sendGroupMessage(groupId, encryptedMessage) {
+        this.socket.emit('send_group_message', {
+            group_id: groupId,
+            encrypted_message: encryptedMessage
+        });
+    }
+
+    /** Request user's groups */
+    getMyGroups() {
+        this.socket.emit('get_my_groups');
+    }
+
+    /* ------------------ Group Event Listeners ------------------ */
+
+    onGroupCreated(fn) {
+        this.groupCreatedListeners.push(fn);
+    }
+
+    onGroupInvitation(fn) {
+        this.groupInvitationListeners.push(fn);
+    }
+
+    onGroupKey(fn) {
+        this.groupKeyListeners.push(fn);
+    }
+
+    onGroupMessage(fn) {
+        this.groupMessageListeners.push(fn);
+    }
+
+    onGroupError(fn) {
+        this.groupErrorListeners.push(fn);
     }
 }

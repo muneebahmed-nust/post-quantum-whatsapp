@@ -5,6 +5,9 @@
 
 import { ChatHandler } from "./chat_handler.js";
 import { SecureChannelManager } from "./secure_channel_manager.js";
+import GroupChatManager from "./group_manager.js";
+import { Message } from "./message.js";
+import { Chat } from "./chat.js";
 
 // Check if Web Crypto API is available
 if (!window.crypto || !window.crypto.subtle) {
@@ -20,11 +23,15 @@ class ChatApp {
         this.currentUser = null;
         this.chatHandler = null;
         this.secureChannelManager = new SecureChannelManager();
+        this.groupManager = null;
+        this.imageHandler = null;
         this.selectedUser = null;
+        this.selectedGroup = null; // Track selected group
+        this.chats = new Map(); // Store Chat objects per user/group
         this.chatHistories = {}; // Store chat messages per user
         this.unreadMessages = {}; // Track unread messages per user
         this.allUsers = {}; // Store all online users
-        this.currentTab = 'chats'; // Track current tab: 'chats' or 'all'
+        this.currentTab = 'chats'; // Track current tab: 'chats', 'groups', or 'all'
         this.searchQuery = ''; // Track search query
         
         this.initializeUI();
@@ -51,6 +58,23 @@ class ChatApp {
         this.showAllUsersBtn = document.getElementById('show-all-users-btn');
         this.chatUserAvatar = document.getElementById('chat-user-avatar');
 
+        // Group modal elements
+        this.createGroupBtn = document.getElementById('create-group-btn');
+        this.groupModal = document.getElementById('group-modal');
+        this.closeGroupModal = document.getElementById('close-group-modal');
+        this.groupNameInput = document.getElementById('group-name-input');
+        this.memberList = document.getElementById('member-list');
+        this.createGroupConfirm = document.getElementById('create-group-confirm');
+        this.cancelGroupCreate = document.getElementById('cancel-group-create');
+
+        // Image upload elements
+        this.attachImageBtn = document.getElementById('attach-image-btn');
+        this.imageInput = document.getElementById('image-input');
+        this.imagePreviewArea = document.getElementById('image-preview-area');
+        this.previewImage = document.getElementById('preview-image');
+        this.previewFilename = document.getElementById('preview-filename');
+        this.removeImagePreview = document.getElementById('remove-image-preview');
+
         // Tab buttons
         const tabButtons = document.querySelectorAll('.tab-btn');
         tabButtons.forEach(btn => {
@@ -76,6 +100,21 @@ class ChatApp {
             this.filterAndDisplayUsers();
         });
 
+        // Group creation modal
+        this.createGroupBtn.addEventListener('click', () => this.showGroupModal());
+        this.closeGroupModal.addEventListener('click', () => this.hideGroupModal());
+        this.cancelGroupCreate.addEventListener('click', () => this.hideGroupModal());
+        this.createGroupConfirm.addEventListener('click', () => this.handleGroupCreation());
+
+        // Image upload
+        this.attachImageBtn.addEventListener('click', () => this.imageInput.click());
+        this.imageInput.addEventListener('change', (e) => this.handleImageSelection(e));
+        this.removeImagePreview.addEventListener('click', () => this.clearImagePreview());
+
+        // Custom event listeners for group functionality
+        window.addEventListener('groupMessage', (e) => this.handleGroupMessageDisplay(e.detail));
+        window.addEventListener('groupListUpdated', (e) => this.handleGroupListUpdate(e.detail));
+
         // Event listeners
         this.loginBtn.addEventListener('click', () => {
             console.log('🖱️ Login button clicked');
@@ -87,9 +126,17 @@ class ChatApp {
                 this.handleLogin();
             }
         });
-        this.sendBtn.addEventListener('click', () => this.sendMessage());
+        this.sendBtn.addEventListener('click', () => {
+            if (this.pendingImage) {
+                this.sendPendingImage();
+            } else {
+                this.sendMessage();
+            }
+        });
         this.msgInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.sendMessage();
+            if (e.key === 'Enter' && !this.pendingImage) {
+                this.sendMessage();
+            }
         });
         console.log('✅ Event listeners attached');
     }
@@ -112,6 +159,10 @@ class ChatApp {
         this.currentUser = username;
         this.chatHandler = new ChatHandler(username, this.secureChannelManager);
         console.log('✅ ChatHandler created');
+
+        // Initialize group manager
+        this.groupManager = new GroupChatManager(this.secureChannelManager, this.chatHandler.socketHandler, this.currentUser);
+        console.log('✅ GroupManager initialized');
 
 
         // Set up message listener
@@ -167,6 +218,17 @@ class ChatApp {
     updateUserList(userMap) {
         // Store all users
         this.allUsers = userMap;
+        
+        // Request public keys for all new users
+        if (this.chatHandler) {
+            Object.keys(userMap).forEach(username => {
+                if (username !== this.currentUser && !this.secureChannelManager.hasPublicKey(username)) {
+                    console.log(`🔑 Requesting public key for ${username}`);
+                    this.chatHandler.socketHandler.requestPubKey(username);
+                }
+            });
+        }
+        
         this.filterAndDisplayUsers();
     }
 
@@ -174,15 +236,36 @@ class ChatApp {
         // Clear current list
         this.userList.innerHTML = '';
 
+        // Handle groups tab
+        if (this.currentTab === 'groups') {
+            if (!this.groupManager) {
+                this.userList.innerHTML = '<div class="no-users-message">No groups yet</div>';
+                return;
+            }
+            
+            const groups = this.groupManager.getGroups();
+            
+            if (groups.length === 0) {
+                this.userList.innerHTML = '<div class="no-users-message">No groups yet. Click the + button to create one.</div>';
+                return;
+            }
+            
+            groups.forEach(group => {
+                this.createGroupListItem(group);
+            });
+            return;
+        }
+
         // Get all users except current user
         let users = Object.keys(this.allUsers).filter(u => u !== this.currentUser);
 
         // Filter based on current tab
         if (this.currentTab === 'chats') {
             // Show only users we have chat history with
-            users = users.filter(u => 
-                this.chatHistories[u] && this.chatHistories[u].length > 0
-            );
+            users = users.filter(u => {
+                const chat = this.chats.get(u);
+                return chat && chat.getMessages().length > 0;
+            });
         }
 
         // Apply search filter
@@ -211,6 +294,40 @@ class ChatApp {
         users.forEach(username => {
             this.createUserListItem(username);
         });
+    }
+
+    createGroupListItem(group) {
+        const groupItem = document.createElement('div');
+        groupItem.className = 'user-item';
+        if (this.selectedGroup === group.id) {
+            groupItem.classList.add('active');
+        }
+
+        const avatar = document.createElement('div');
+        avatar.className = 'user-avatar';
+        avatar.textContent = '👥';
+        avatar.style.background = 'var(--whatsapp-green)';
+
+        const groupInfo = document.createElement('div');
+        groupInfo.className = 'user-info';
+
+        const groupName = document.createElement('div');
+        groupName.className = 'user-name';
+        groupName.textContent = group.name;
+
+        const groupDetails = document.createElement('div');
+        groupDetails.className = 'user-last-message';
+        groupDetails.textContent = `${group.members.length} members`;
+
+        groupInfo.appendChild(groupName);
+        groupInfo.appendChild(groupDetails);
+
+        groupItem.appendChild(avatar);
+        groupItem.appendChild(groupInfo);
+
+        groupItem.addEventListener('click', () => this.selectGroup(group.id));
+
+        this.userList.appendChild(groupItem);
     }
 
     createUserListItem(username) {
@@ -270,6 +387,7 @@ class ChatApp {
         if (this.selectedUser === username) return;
 
         this.selectedUser = username;
+        this.selectedGroup = null; // Clear group selection
         this.selectedUserName.textContent = username;
         
         // Update chat header avatar
@@ -359,47 +477,73 @@ class ChatApp {
     loadChatHistory(username) {
         this.chatBox.innerHTML = '';
         
-        if (!this.chatHistories[username]) {
-            this.chatHistories[username] = [];
+        // Get or create chat
+        let chat = this.chats.get(username);
+        if (!chat) {
+            chat = new Chat('personal', username, username);
+            this.chats.set(username, chat);
         }
 
-        this.chatHistories[username].forEach(msg => {
-            this.displayMessage(msg.from, msg.text, msg.isSent, false);
+        // Display all messages
+        chat.getMessages().forEach(msg => {
+            if (msg instanceof Message) {
+                if (msg.content_type === 'image' && msg.image_base64) {
+                    this.displayImageInChat(msg.sender || 'Unknown', msg.image_base64, msg.content);
+                } else {
+                    this.displayMessage(msg.sender || 'Unknown', msg.content, msg.isSent, false);
+                }
+            } else {
+                // Legacy format support
+                if (msg.isImage && msg.imageData) {
+                    this.displayImageInChat(msg.from, msg.imageData);
+                } else {
+                    this.displayMessage(msg.from, msg.text, msg.isSent, false);
+                }
+            }
         });
 
         this.scrollToBottom();
     }
 
     async sendMessage() {
-        if (!this.selectedUser) {
-            alert('Please select a user first');
-            return;
-        }
-
         const text = this.msgInput.value.trim();
         if (!text) return;
 
         try {
-            await this.chatHandler.sendMessage(this.selectedUser, text);
-            
-            // Add to chat history
-            if (!this.chatHistories[this.selectedUser]) {
-                this.chatHistories[this.selectedUser] = [];
+            if (this.selectedGroup) {
+                // Send group message
+                await this.groupManager.sendGroupMessage(this.selectedGroup, text);
+                
+                // Clear input
+                this.msgInput.value = '';
+                this.scrollToBottom();
+            } else if (this.selectedUser) {
+                // Create Message object
+                const message = new Message('text', text);
+                message.sender = this.currentUser;
+                message.isSent = true;
+                
+                // Send direct message as serialized Message object
+                const messageJson = message.toJsonString();
+                await this.chatHandler.sendMessage(this.selectedUser, messageJson);
+                
+                // Add to chat using Chat class
+                let chat = this.chats.get(this.selectedUser);
+                if (!chat) {
+                    chat = new Chat('personal', this.selectedUser, this.selectedUser);
+                    this.chats.set(this.selectedUser, chat);
+                }
+                chat.addMessage(message);
+
+                // Display message
+                this.displayMessage(this.currentUser, text, true);
+                
+                // Clear input
+                this.msgInput.value = '';
+                this.scrollToBottom();
+            } else {
+                alert('Please select a user or group first');
             }
-            this.chatHistories[this.selectedUser].push({
-                from: this.currentUser,
-                text: text,
-                isSent: true,
-                timestamp: new Date()
-            });
-
-            // Display message
-            this.displayMessage(this.currentUser, text, true);
-            
-            // Clear input
-            this.msgInput.value = '';
-            this.scrollToBottom();
-
         } catch (error) {
             console.error('Failed to send message:', error);
             this.addSystemMessage('Failed to send message. Please try again.', true);
@@ -407,22 +551,51 @@ class ChatApp {
     }
 
     handleIncomingMessage(fromUser, decryptedText) {
-        console.log(`📩 Message from ${fromUser}: ${decryptedText}`);
+        console.log(`📩 Message from ${fromUser}: ${decryptedText.substring(0, 50)}...`);
 
-        // Add to chat history
-        if (!this.chatHistories[fromUser]) {
-            this.chatHistories[fromUser] = [];
+        // Try to parse as Message object
+        let message;
+        let displayText = decryptedText;
+        let isImage = false;
+        
+        try {
+            message = Message.fromJsonString(decryptedText);
+            if (message.content_type === 'image' && message.image_base64) {
+                isImage = true;
+                displayText = 'Image';
+            } else {
+                displayText = message.content;
+            }
+        } catch {
+            // Plain text message
+            displayText = decryptedText;
         }
-        this.chatHistories[fromUser].push({
-            from: fromUser,
-            text: decryptedText,
-            isSent: false,
-            timestamp: new Date()
-        });
+
+        // Add to chat using Chat class
+        let chat = this.chats.get(fromUser);
+        if (!chat) {
+            chat = new Chat('personal', fromUser, fromUser);
+            this.chats.set(fromUser, chat);
+        }
+        
+        if (message instanceof Message) {
+            message.sender = fromUser;
+            message.isSent = false;
+            chat.addMessage(message);
+        } else {
+            const msg = new Message('text', displayText);
+            msg.sender = fromUser;
+            msg.isSent = false;
+            chat.addMessage(msg);
+        }
 
         // Display if this is the active chat
         if (this.selectedUser === fromUser) {
-            this.displayMessage(fromUser, decryptedText, false);
+            if (isImage) {
+                this.displayImageInChat(fromUser, message.image_base64, message.content);
+            } else {
+                this.displayMessage(fromUser, displayText, false);
+            }
             this.scrollToBottom();
         } else {
             // Increment unread counter
@@ -446,6 +619,7 @@ class ChatApp {
         senderDiv.textContent = isSent ? 'You' : from;
 
         const textDiv = document.createElement('div');
+        textDiv.className = 'message-text';
         textDiv.textContent = text;
 
         const timeDiv = document.createElement('div');
@@ -483,6 +657,363 @@ class ChatApp {
                 this.chatBox.scrollTop = this.chatBox.scrollHeight;
             }, 0);
         }
+    }
+
+    // Group functionality methods
+    showGroupModal() {
+        if (!this.groupModal) return;
+        
+        // Populate member list with all online users
+        this.memberList.innerHTML = '';
+        const users = Object.keys(this.allUsers).filter(u => u !== this.currentUser);
+        
+        if (users.length === 0) {
+            this.memberList.innerHTML = '<div style="padding: 1rem; text-align: center; color: #666;">No other users online</div>';
+        } else {
+            users.forEach(username => {
+                const memberItem = document.createElement('div');
+                memberItem.className = 'member-item';
+                
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `member-${username}`;
+                checkbox.value = username;
+                
+                const label = document.createElement('label');
+                label.htmlFor = `member-${username}`;
+                label.textContent = username;
+                label.style.cursor = 'pointer';
+                label.style.flex = '1';
+                
+                memberItem.appendChild(checkbox);
+                memberItem.appendChild(label);
+                this.memberList.appendChild(memberItem);
+            });
+        }
+        
+        this.groupModal.style.display = 'flex';
+    }
+
+    hideGroupModal() {
+        if (!this.groupModal) return;
+        this.groupModal.style.display = 'none';
+        this.groupNameInput.value = '';
+    }
+
+    async handleGroupCreation() {
+        const groupName = this.groupNameInput.value.trim();
+        
+        if (!groupName) {
+            alert('Please enter a group name');
+            return;
+        }
+        
+        // Get selected members
+        const checkboxes = this.memberList.querySelectorAll('input[type="checkbox"]:checked');
+        const members = Array.from(checkboxes).map(cb => cb.value);
+        
+        if (members.length === 0) {
+            alert('Please select at least one member');
+            return;
+        }
+        
+        // Check if we have public keys for all members, request if missing
+        const missingKeys = members.filter(username => !this.secureChannelManager.hasPublicKey(username));
+        
+        if (missingKeys.length > 0) {
+            console.log(`🔑 Requesting missing public keys for:`, missingKeys);
+            
+            // Request missing public keys
+            missingKeys.forEach(username => {
+                this.chatHandler.socketHandler.requestPubKey(username);
+            });
+            
+            // Wait a bit for the keys to arrive
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Check again
+            const stillMissing = members.filter(username => !this.secureChannelManager.hasPublicKey(username));
+            if (stillMissing.length > 0) {
+                alert(`Cannot create group: Missing public keys for ${stillMissing.join(', ')}. Please ensure all members are online.`);
+                return;
+            }
+        }
+        
+        // Create group via GroupManager
+        await this.groupManager.createGroup(groupName, members);
+        
+        this.hideGroupModal();
+    }
+
+    handleGroupListUpdate(detail) {
+        const { groups } = detail;
+        
+        // Update UI to show groups in the groups tab
+        if (this.currentTab === 'groups') {
+            this.filterAndDisplayUsers();
+        }
+    }
+
+    selectGroup(groupId) {
+        const group = this.groupManager.getGroup(groupId);
+        if (!group) return;
+        
+        this.selectedUser = null;
+        this.selectedGroup = groupId;
+        
+        // Update UI
+        this.noChatSelected.style.display = 'none';
+        this.chatContainer.style.display = 'flex';
+        this.selectedUserName.textContent = group.name;
+        this.chatUserAvatar.textContent = '👥';
+        
+        // Load group chat history from Chat class
+        this.chatBox.innerHTML = '';
+        let chat = this.chats.get(groupId);
+        if (!chat) {
+            chat = new Chat('group', groupId, group.name);
+            this.chats.set(groupId, chat);
+        }
+        
+        // Display all messages
+        chat.getMessages().forEach(msgObj => {
+            const message = msgObj.message || msgObj;
+            const sender = msgObj.sender || 'Unknown';
+            
+            if (message instanceof Message) {
+                if (message.content_type === 'image' && message.image_base64) {
+                    this.displayImageInChat(sender, message.image_base64, message.content);
+                } else {
+                    this.displayMessage(sender, message.content, sender === this.currentUser);
+                }
+            } else if (typeof message === 'string') {
+                this.displayMessage(sender, message, sender === this.currentUser);
+            }
+        });
+        
+        this.connectionStatus.textContent = `${group.members.length} members`;
+        this.connectionStatus.className = 'status-connected';
+        this.scrollToBottom();
+    }
+
+    handleGroupMessageDisplay(detail) {
+        const { groupId, sender, message } = detail;
+        
+        // Add to group chat using Chat class
+        let chat = this.chats.get(groupId);
+        if (!chat) {
+            const group = this.groupManager.getGroup(groupId);
+            chat = new Chat('group', groupId, group?.name || 'Group');
+            this.chats.set(groupId, chat);
+        }
+        
+        // Parse and store message
+        let parsedMessage;
+        const isCurrentUser = sender === this.currentUser;
+        try {
+            parsedMessage = Message.fromJsonString(message);
+            parsedMessage.sender = sender;
+            parsedMessage.isSent = isCurrentUser;
+        } catch {
+            parsedMessage = new Message('text', message);
+            parsedMessage.sender = sender;
+            parsedMessage.isSent = isCurrentUser;
+        }
+
+        chat.addMessage(sender, parsedMessage);
+
+        // Only display if this group is selected
+        if (this.selectedGroup === groupId) {
+            // Display 'You' for current user's messages, actual sender name for others
+            const displaySender = isCurrentUser ? 'You' : sender;
+            if (parsedMessage.content_type === 'image' && parsedMessage.image_base64) {
+                this.displayImageInChat(displaySender, parsedMessage.image_base64, parsedMessage.content);
+            } else {
+                this.displayMessage(displaySender, parsedMessage.content, parsedMessage.isSent);
+            }
+        }
+    }
+
+    async handleImageSelection(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        // Clear the input
+        event.target.value = '';
+        
+        if (!file.type.startsWith('image/')) {
+            alert('Please select a valid image file');
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) { // 5MB limit
+            alert('Image too large. Maximum size is 5MB');
+            return;
+        }
+
+        try {
+            // Convert image to base64
+            const base64Image = await Message.imageToBase64(file);
+            
+            // Show preview
+            this.showImagePreview(base64Image, file.name);
+            
+            // Store for sending
+            this.pendingImage = {
+                base64: base64Image,
+                filename: file.name
+            };
+            
+            // Update send button
+            this.sendBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
+            this.msgInput.placeholder = 'Add a caption (optional)...';
+        } catch (error) {
+            console.error('❌ Failed to process image:', error);
+            alert('Failed to process image');
+        }
+    }
+
+    showImagePreview(base64Image, filename) {
+        this.previewImage.src = base64Image;
+        this.previewFilename.textContent = filename;
+        this.imagePreviewArea.style.display = 'flex';
+    }
+
+    clearImagePreview() {
+        this.previewImage.src = '';
+        this.previewFilename.textContent = '';
+        this.imagePreviewArea.style.display = 'none';
+        this.pendingImage = null;
+        this.msgInput.placeholder = 'Type a message...';
+        this.sendBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
+    }
+
+    async sendPendingImage() {
+        if (!this.pendingImage) return;
+        
+        const caption = this.msgInput.value.trim();
+        const base64Image = this.pendingImage.base64;
+        
+        try {
+            if (this.selectedGroup) {
+                await this.sendGroupImage(this.selectedGroup, base64Image, caption);
+            } else if (this.selectedUser) {
+                await this.sendDirectImage(this.selectedUser, base64Image, caption);
+            } else {
+                alert('Please select a user or group first');
+                return;
+            }
+            
+            // Clear preview and input
+            this.clearImagePreview();
+            this.msgInput.value = '';
+        } catch (error) {
+            console.error('❌ Failed to send image:', error);
+            alert('Failed to send image');
+        }
+    }
+
+    async sendDirectImage(username, base64Image, caption = '') {
+        try {
+            // Create Message object
+            const message = new Message('image', caption || 'Image');
+            message.image_base64 = base64Image;
+            message.sender = this.currentUser;
+            message.isSent = true;
+            
+            // Send via ChatHandler which handles encryption
+            const messageJson = message.toJsonString();
+            await this.chatHandler.sendMessage(username, messageJson);
+
+            // Add to chat using Chat class
+            let chat = this.chats.get(username);
+            if (!chat) {
+                chat = new Chat('personal', username, username);
+                this.chats.set(username, chat);
+            }
+            chat.addMessage(message);
+
+            // Display in own chat
+            this.displayImageInChat('You', base64Image, caption);
+            console.log(`✅ Image sent to ${username}`);
+        } catch (error) {
+            console.error('❌ Failed to send direct image:', error);
+            throw error;
+        }
+    }
+
+    async sendGroupImage(groupId, base64Image, caption = '') {
+        try {
+            // Create Message object
+            const message = new Message('image', caption || 'Image');
+            message.image_base64 = base64Image;
+            message.sender = this.currentUser;
+            message.isSent = true;
+            
+            // Send via GroupManager which handles encryption
+            const messageJson = message.toJsonString();
+            await this.groupManager.sendGroupMessage(groupId, messageJson);
+
+            // Add to group chat using Chat class
+            let chat = this.chats.get(groupId);
+            if (!chat) {
+                const group = this.groupManager.getGroup(groupId);
+                chat = new Chat('group', groupId, group?.name || 'Group');
+                this.chats.set(groupId, chat);
+            }
+            chat.addMessage(this.currentUser, message);
+
+            // Display in own chat
+            this.displayImageInChat('You', base64Image, caption);
+            console.log(`✅ Image sent to group`);
+        } catch (error) {
+            console.error('❌ Failed to send group image:', error);
+            throw error;
+        }
+    }
+
+    displayImageInChat(sender, base64Image, caption = '') {
+        const isCurrentUser = sender === 'You';
+        const messageDiv = document.createElement('div');
+        messageDiv.className = `message ${isCurrentUser ? 'sent' : 'received'}`;
+        
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        
+        const senderDiv = document.createElement('div');
+        senderDiv.className = 'message-sender';
+        senderDiv.textContent = sender;
+        
+        const img = document.createElement('img');
+        img.className = 'message-image';
+        img.src = base64Image;
+        
+        // Open full image in new tab on click
+        img.addEventListener('click', () => {
+            window.open(base64Image, '_blank');
+        });
+        
+        contentDiv.appendChild(senderDiv);
+        
+        // Add caption if provided
+        if (caption) {
+            const captionDiv = document.createElement('div');
+            captionDiv.className = 'message-text';
+            captionDiv.textContent = caption;
+            contentDiv.appendChild(captionDiv);
+        }
+        
+        contentDiv.appendChild(img);
+        
+        const timeDiv = document.createElement('div');
+        timeDiv.className = 'message-time';
+        timeDiv.textContent = new Date().toLocaleTimeString();
+        contentDiv.appendChild(timeDiv);
+        
+        messageDiv.appendChild(contentDiv);
+        
+        this.chatBox.appendChild(messageDiv);
+        this.scrollToBottom();
     }
 }
 

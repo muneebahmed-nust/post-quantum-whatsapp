@@ -18,6 +18,8 @@ export class ChatHandler {
         });
 
         this.socketHandler.onPubKey((username, pubkeyB64) => {
+            // Store the public key in SecureChannelManager
+            this.secureChannelManager.storeUserPublicKey(username, pubkeyB64);
             this.pubKeyListeners.forEach(fn => fn(username, pubkeyB64));
         });
 
@@ -141,6 +143,10 @@ export class ChatHandler {
             
             const listener = (username, pubkeyB64) => {
                 if (username === targetUserName) {
+                    // Remove the listener when we get the pubkey
+                    const idx = this.pubKeyListeners.indexOf(listener);
+                    if (idx > -1) this.pubKeyListeners.splice(idx, 1);
+                    clearInterval(interval);
                     resolve(pubkeyB64);
                 }
             };
