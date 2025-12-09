@@ -33,6 +33,7 @@ class ChatApp {
         this.allUsers = {}; // Store all online users
         this.currentTab = 'chats'; // Track current tab: 'chats', 'groups', or 'all'
         this.searchQuery = ''; // Track search query
+        this.isSendingImage = false; // Flag to prevent double-sending images
         
         this.initializeUI();
         console.log('✅ ChatApp initialized successfully');
@@ -884,12 +885,22 @@ class ChatApp {
         this.previewFilename.textContent = '';
         this.imagePreviewArea.style.display = 'none';
         this.pendingImage = null;
+        this.imageInput.value = ''; // Ensure input is cleared
         this.msgInput.placeholder = 'Type a message...';
         this.sendBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
     }
 
     async sendPendingImage() {
         if (!this.pendingImage) return;
+        
+        // Prevent double-sending
+        if (this.isSendingImage) {
+            console.log('⏳ Image is already being sent, please wait...');
+            return;
+        }
+        
+        this.isSendingImage = true;
+        this.sendBtn.disabled = true;
         
         const caption = this.msgInput.value.trim();
         const base64Image = this.pendingImage.base64;
@@ -901,6 +912,8 @@ class ChatApp {
                 await this.sendDirectImage(this.selectedUser, base64Image, caption);
             } else {
                 alert('Please select a user or group first');
+                this.isSendingImage = false;
+                this.sendBtn.disabled = false;
                 return;
             }
             
@@ -910,6 +923,9 @@ class ChatApp {
         } catch (error) {
             console.error('❌ Failed to send image:', error);
             alert('Failed to send image');
+        } finally {
+            this.isSendingImage = false;
+            this.sendBtn.disabled = false;
         }
     }
 
