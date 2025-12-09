@@ -126,7 +126,6 @@ header p {
 #chat-screen {
     display: none;
     flex: 1;
-    display: flex;
     overflow: hidden;
 }
 
