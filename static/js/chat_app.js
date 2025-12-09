@@ -615,6 +615,8 @@ class ChatApp {
     displayMessage(from, text, isSent, scroll = true) {
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isSent ? 'sent' : 'received'}`;
+        messageDiv.style.position = 'relative';
+        messageDiv.style.cursor = 'pointer';
 
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
@@ -635,6 +637,98 @@ class ChatApp {
         contentDiv.appendChild(textDiv);
         contentDiv.appendChild(timeDiv);
         messageDiv.appendChild(contentDiv);
+        
+        // Create context menu for text message
+        const textContextMenu = document.createElement('div');
+        textContextMenu.className = 'image-context-menu';
+        textContextMenu.style.display = 'none';
+        textContextMenu.style.position = 'fixed';
+        textContextMenu.style.background = '#2a3942';
+        textContextMenu.style.borderRadius = '6px';
+        textContextMenu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+        textContextMenu.style.minWidth = '150px';
+        textContextMenu.style.zIndex = '1001';
+        textContextMenu.style.overflow = 'hidden';
+        
+        // Copy text option
+        const copyTextOption = document.createElement('div');
+        copyTextOption.className = 'popup-menu-item';
+        copyTextOption.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+            </svg>
+            <span>Copy text</span>
+        `;
+        copyTextOption.style.padding = '10px 12px';
+        copyTextOption.style.cursor = 'pointer';
+        copyTextOption.style.display = 'flex';
+        copyTextOption.style.alignItems = 'center';
+        copyTextOption.style.gap = '8px';
+        copyTextOption.style.color = '#e9edef';
+        copyTextOption.style.transition = 'background 0.2s';
+        
+        copyTextOption.addEventListener('mouseenter', () => {
+            copyTextOption.style.background = '#3a4952';
+        });
+        copyTextOption.addEventListener('mouseleave', () => {
+            copyTextOption.style.background = 'transparent';
+        });
+        
+        copyTextOption.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                await navigator.clipboard.writeText(text);
+                copyTextOption.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                    <span>Copied!</span>
+                `;
+                setTimeout(() => {
+                    copyTextOption.innerHTML = `
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        </svg>
+                        <span>Copy text</span>
+                    `;
+                    textContextMenu.style.display = 'none';
+                }, 1000);
+            } catch (err) {
+                console.error('Failed to copy text:', err);
+                alert('Failed to copy text');
+            }
+        });
+        
+        textContextMenu.appendChild(copyTextOption);
+        
+        // Show context menu on click
+        messageDiv.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            // Hide any other open menus
+            document.querySelectorAll('.image-context-menu').forEach(menu => {
+                if (menu !== textContextMenu) menu.style.display = 'none';
+            });
+            
+            if (textContextMenu.style.display === 'block') {
+                textContextMenu.style.display = 'none';
+            } else {
+                // Position the menu near the message
+                const rect = messageDiv.getBoundingClientRect();
+                textContextMenu.style.left = `${rect.right - 150}px`;
+                textContextMenu.style.top = `${rect.top + window.scrollY}px`;
+                textContextMenu.style.display = 'block';
+            }
+        });
+        
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!textContextMenu.contains(e.target) && !messageDiv.contains(e.target)) {
+                textContextMenu.style.display = 'none';
+            }
+        });
+        
+        document.body.appendChild(textContextMenu);
 
         this.chatBox.appendChild(messageDiv);
         
@@ -1004,6 +1098,7 @@ class ChatApp {
         const isCurrentUser = sender === 'You';
         const messageDiv = document.createElement('div');
         messageDiv.className = `message ${isCurrentUser ? 'sent' : 'received'}`;
+        messageDiv.style.position = 'relative';
         
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
@@ -1012,58 +1107,54 @@ class ChatApp {
         senderDiv.className = 'message-sender';
         senderDiv.textContent = sender;
         
-        // Image container with action buttons
+        // Image container
         const imageContainer = document.createElement('div');
         imageContainer.className = 'image-container';
         imageContainer.style.position = 'relative';
         imageContainer.style.display = 'inline-block';
+        imageContainer.style.cursor = 'pointer';
         
         const img = document.createElement('img');
         img.className = 'message-image';
         img.src = base64Image;
         
-        // Open full image in new tab on click
-        img.addEventListener('click', () => {
-            window.open(base64Image, '_blank');
+        // Create context menu popup
+        const contextMenu = document.createElement('div');
+        contextMenu.className = 'image-context-menu';
+        contextMenu.style.display = 'none';
+        contextMenu.style.position = 'fixed';
+        contextMenu.style.background = '#2a3942';
+        contextMenu.style.borderRadius = '6px';
+        contextMenu.style.boxShadow = '0 2px 8px rgba(0,0,0,0.3)';
+        contextMenu.style.minWidth = '180px';
+        contextMenu.style.zIndex = '1001';
+        contextMenu.style.overflow = 'hidden';
+        
+        // Copy image option
+        const copyImageOption = document.createElement('div');
+        copyImageOption.className = 'popup-menu-item';
+        copyImageOption.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+            </svg>
+            <span>Copy image</span>
+        `;
+        copyImageOption.style.padding = '10px 12px';
+        copyImageOption.style.cursor = 'pointer';
+        copyImageOption.style.display = 'flex';
+        copyImageOption.style.alignItems = 'center';
+        copyImageOption.style.gap = '8px';
+        copyImageOption.style.color = '#e9edef';
+        copyImageOption.style.transition = 'background 0.2s';
+        
+        copyImageOption.addEventListener('mouseenter', () => {
+            copyImageOption.style.background = '#3a4952';
+        });
+        copyImageOption.addEventListener('mouseleave', () => {
+            copyImageOption.style.background = 'transparent';
         });
         
-        // Action buttons container
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'image-actions';
-        actionsDiv.style.position = 'absolute';
-        actionsDiv.style.top = '8px';
-        actionsDiv.style.right = '8px';
-        actionsDiv.style.display = 'flex';
-        actionsDiv.style.gap = '6px';
-        actionsDiv.style.opacity = '0';
-        actionsDiv.style.transition = 'opacity 0.2s';
-        
-        // Show buttons on hover
-        imageContainer.addEventListener('mouseenter', () => {
-            actionsDiv.style.opacity = '1';
-        });
-        imageContainer.addEventListener('mouseleave', () => {
-            actionsDiv.style.opacity = '0';
-        });
-        
-        // Copy button
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'image-action-btn';
-        copyBtn.title = 'Copy image';
-        copyBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-        </svg>`;
-        copyBtn.style.background = 'rgba(0, 0, 0, 0.6)';
-        copyBtn.style.border = 'none';
-        copyBtn.style.borderRadius = '4px';
-        copyBtn.style.padding = '6px';
-        copyBtn.style.cursor = 'pointer';
-        copyBtn.style.color = 'white';
-        copyBtn.style.display = 'flex';
-        copyBtn.style.alignItems = 'center';
-        copyBtn.style.justifyContent = 'center';
-        
-        copyBtn.addEventListener('click', async (e) => {
+        copyImageOption.addEventListener('click', async (e) => {
             e.stopPropagation();
             try {
                 const blob = await fetch(base64Image).then(r => r.blob());
@@ -1071,42 +1162,54 @@ class ChatApp {
                     new ClipboardItem({ [blob.type]: blob })
                 ]);
                 
-                // Visual feedback
-                copyBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                </svg>`;
-                copyBtn.style.background = 'rgba(0, 200, 0, 0.8)';
-                
+                copyImageOption.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                    </svg>
+                    <span>Copied!</span>
+                `;
                 setTimeout(() => {
-                    copyBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
-                    </svg>`;
-                    copyBtn.style.background = 'rgba(0, 0, 0, 0.6)';
-                }, 1500);
+                    copyImageOption.innerHTML = `
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                        </svg>
+                        <span>Copy image</span>
+                    `;
+                    contextMenu.style.display = 'none';
+                }, 1000);
             } catch (err) {
                 console.error('Failed to copy image:', err);
-                alert('Failed to copy image to clipboard');
+                alert('Failed to copy image');
             }
         });
         
-        // Download button
-        const downloadBtn = document.createElement('button');
-        downloadBtn.className = 'image-action-btn';
-        downloadBtn.title = 'Download image';
-        downloadBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-        </svg>`;
-        downloadBtn.style.background = 'rgba(0, 0, 0, 0.6)';
-        downloadBtn.style.border = 'none';
-        downloadBtn.style.borderRadius = '4px';
-        downloadBtn.style.padding = '6px';
-        downloadBtn.style.cursor = 'pointer';
-        downloadBtn.style.color = 'white';
-        downloadBtn.style.display = 'flex';
-        downloadBtn.style.alignItems = 'center';
-        downloadBtn.style.justifyContent = 'center';
+        contextMenu.appendChild(copyImageOption);
         
-        downloadBtn.addEventListener('click', (e) => {
+        // Download option
+        const downloadOption = document.createElement('div');
+        downloadOption.className = 'popup-menu-item';
+        downloadOption.innerHTML = `
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+            </svg>
+            <span>Download image</span>
+        `;
+        downloadOption.style.padding = '10px 12px';
+        downloadOption.style.cursor = 'pointer';
+        downloadOption.style.display = 'flex';
+        downloadOption.style.alignItems = 'center';
+        downloadOption.style.gap = '8px';
+        downloadOption.style.color = '#e9edef';
+        downloadOption.style.transition = 'background 0.2s';
+        
+        downloadOption.addEventListener('mouseenter', () => {
+            downloadOption.style.background = '#3a4952';
+        });
+        downloadOption.addEventListener('mouseleave', () => {
+            downloadOption.style.background = 'transparent';
+        });
+        
+        downloadOption.addEventListener('click', (e) => {
             e.stopPropagation();
             const link = document.createElement('a');
             link.href = base64Image;
@@ -1115,25 +1218,122 @@ class ChatApp {
             link.click();
             document.body.removeChild(link);
             
-            // Visual feedback
-            downloadBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-            </svg>`;
-            downloadBtn.style.background = 'rgba(0, 200, 0, 0.8)';
-            
+            downloadOption.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                </svg>
+                <span>Downloaded!</span>
+            `;
             setTimeout(() => {
-                downloadBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
-                </svg>`;
-                downloadBtn.style.background = 'rgba(0, 0, 0, 0.6)';
-            }, 1500);
+                downloadOption.innerHTML = `
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                    </svg>
+                    <span>Download image</span>
+                `;
+                contextMenu.style.display = 'none';
+            }, 1000);
         });
         
-        actionsDiv.appendChild(copyBtn);
-        actionsDiv.appendChild(downloadBtn);
+        contextMenu.appendChild(downloadOption);
+        
+        // Copy caption option (only if caption exists)
+        if (caption && caption.trim()) {
+            const copyCaptionOption = document.createElement('div');
+            copyCaptionOption.className = 'popup-menu-item';
+            copyCaptionOption.innerHTML = `
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm-1 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h7c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h7v14z"/>
+                </svg>
+                <span>Copy caption</span>
+            `;
+            copyCaptionOption.style.padding = '10px 12px';
+            copyCaptionOption.style.cursor = 'pointer';
+            copyCaptionOption.style.display = 'flex';
+            copyCaptionOption.style.alignItems = 'center';
+            copyCaptionOption.style.gap = '8px';
+            copyCaptionOption.style.color = '#e9edef';
+            copyCaptionOption.style.transition = 'background 0.2s';
+            
+            copyCaptionOption.addEventListener('mouseenter', () => {
+                copyCaptionOption.style.background = '#3a4952';
+            });
+            copyCaptionOption.addEventListener('mouseleave', () => {
+                copyCaptionOption.style.background = 'transparent';
+            });
+            
+            copyCaptionOption.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                try {
+                    await navigator.clipboard.writeText(caption);
+                    copyCaptionOption.innerHTML = `
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                        <span>Copied!</span>
+                    `;
+                    setTimeout(() => {
+                        copyCaptionOption.innerHTML = `
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm-1 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h7c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h7v14z"/>
+                            </svg>
+                            <span>Copy caption</span>
+                        `;
+                        contextMenu.style.display = 'none';
+                    }, 1000);
+                } catch (err) {
+                    console.error('Failed to copy caption:', err);
+                    alert('Failed to copy caption');
+                }
+            });
+            
+            contextMenu.appendChild(copyCaptionOption);
+        }
+        
+        // Show context menu on right-click
+        imageContainer.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            
+            // Hide any other open menus
+            document.querySelectorAll('.image-context-menu').forEach(menu => {
+                if (menu !== contextMenu) menu.style.display = 'none';
+            });
+            
+            // Position the menu
+            contextMenu.style.left = `${e.pageX}px`;
+            contextMenu.style.top = `${e.pageY}px`;
+            contextMenu.style.display = 'block';
+        });
+        
+        // Close menu when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!contextMenu.contains(e.target) && !imageContainer.contains(e.target)) {
+                contextMenu.style.display = 'none';
+            }
+        });
+        
+        // Also allow left click on image to show menu
+        imageContainer.addEventListener('click', (e) => {
+            e.stopPropagation();
+            
+            // Hide any other open menus
+            document.querySelectorAll('.image-context-menu').forEach(menu => {
+                if (menu !== contextMenu) menu.style.display = 'none';
+            });
+            
+            if (contextMenu.style.display === 'block') {
+                contextMenu.style.display = 'none';
+            } else {
+                // Position the menu near the image
+                const rect = imageContainer.getBoundingClientRect();
+                contextMenu.style.left = `${rect.right - 180}px`;
+                contextMenu.style.top = `${rect.top + window.scrollY}px`;
+                contextMenu.style.display = 'block';
+            }
+        });
         
         imageContainer.appendChild(img);
-        imageContainer.appendChild(actionsDiv);
+        document.body.appendChild(contextMenu);
         
         contentDiv.appendChild(senderDiv);
         

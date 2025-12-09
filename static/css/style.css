@@ -765,7 +765,7 @@ header p {
 .message-image {
     max-width: 300px;
     max-height: 300px;
-    border-radius: 8px;
+    border-radius: 4px;
     cursor: pointer;
     margin-top: 0.5rem;
 }
@@ -942,5 +942,43 @@ header p {
 .image-action-btn svg {
     display: block;
     pointer-events: none;
+}
+
+/* Image popup menu */
+.image-popup-menu {
+    display: none;
+    position: absolute;
+    top: 100%;
+    right: 0;
+    margin-top: 4px;
+    background: #2a3942;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    min-width: 150px;
+    z-index: 1000;
+    overflow: hidden;
+}
+
+.popup-menu-item {
+    padding: 10px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #e9edef;
+    transition: background 0.2s;
+    font-size: 14px;
+}
+
+.popup-menu-item:hover {
+    background: #3a4952;
+}
+
+.popup-menu-item svg {
+    flex-shrink: 0;
+}
+
+.popup-menu-item span {
+    white-space: nowrap;
 }
 
