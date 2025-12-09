@@ -35,6 +35,8 @@ Quanta provides WhatsApp-like user interface with military-grade encryption that
 - 💬 **Modern UI**: Clean, responsive WhatsApp-inspired interface
 - 🔍 **User Search**: Find and connect with online users easily
 - 📱 **Tab System**: Separate views for active chats and all users
+- 👥 **Group Chat**: Create groups, distribute keys securely, and chat with multiple members in real time
+- 🖼️ **Encrypted Images**: Share images (with optional captions) in 1:1 and group chats, encrypted end‑to‑end
 
 ---
 
@@ -112,6 +114,7 @@ The application follows a **client-server architecture** with end-to-end encrypt
 - **Socket.IO Client** - Real-time communication
 - **Web Crypto API** - Browser cryptographic operations
 - **ML-KEM JavaScript Library** - Post-quantum key exchange
+- **Group Chat Manager** - Client-side group lifecycle and messaging
 
 ### Cryptography
 - **ML-KEM-512 (Kyber)** - Post-quantum key encapsulation
@@ -229,6 +232,17 @@ async function sendMessage(recipient, plaintext) {
 - Server only sees encrypted data
 - Server routes encrypted message to recipient
 - Server CANNOT read the message
+
+### Group Messaging (End‑to‑End)
+
+Group chats use a shared AES‑256 key per group. The group admin generates this key locally and distributes it to each member using their ML‑KEM public key:
+
+1. Admin creates a group → a random AES‑256 group key is generated in the browser.
+2. For each member, the admin encapsulates a unique shared secret using ML‑KEM and encrypts the group key with it.
+3. The server relays the per‑member encrypted group key; only the intended member can decrypt it.
+4. All group messages (and images) are then encrypted with the group key and delivered in real time.
+
+This approach keeps the server unaware of plaintext and of the group key itself.
 
 ### Stage 4: Receiving Messages
 
@@ -355,7 +369,17 @@ class ChatApp {
 }
 ```
 
-#### 2. `secure_channel_manager.js` - Cryptographic Core
+#### 2. `group_manager.js` - Group Lifecycle & Messaging
+
+```javascript
+class GroupChatManager {
+    // Creates groups, distributes per‑group AES‑256 keys using ML‑KEM,
+    // decrypts incoming group keys, and encrypts/decrypts group messages.
+    // Integrates with SocketHandler for signaling and delivery.
+}
+```
+
+#### 3. `secure_channel_manager.js` - Cryptographic Core
 
 ```javascript
 class SecureChannelManager {
@@ -400,7 +424,7 @@ class SecureChannelManager {
 }
 ```
 
-#### 3. `chat_handler.js` - Message Protocol Handler
+#### 4. `chat_handler.js` - Message Protocol Handler
 
 ```javascript
 class ChatHandler {
@@ -436,7 +460,7 @@ class ChatHandler {
 }
 ```
 
-#### 4. `socket_handler.js` - WebSocket Communication
+#### 5. `socket_handler.js` - WebSocket Communication
 
 ```javascript
 class SocketHandler {
@@ -608,6 +632,16 @@ Alice: sharedSecrets["Bob"]   = aesKey_A
 Bob:   sharedSecrets["Alice"] = aesKey_B
 aesKey_A === aesKey_B ✓
 ```
+
+### Socket.IO Events (Reference)
+
+- `register_user` / `registration_confirmed`: username registration
+- `pubkey` / `pubkey_response`: publish/request ML‑KEM public keys
+- `send_kem_ciphertext` / `recv_kem_ciphertext`: share encapsulated secrets
+- `send_message` / `recv_message`: 1:1 encrypted messages
+- `create_group` / `group_created` / `group_invitation`: group lifecycle
+- `distribute_group_key` / `group_key`: per‑member delivery of encrypted group key
+- `send_group_message` / `recv_group_message`: encrypted group messages
 
 #### **Phase 3: Alice Sends Message "Hello!"**
 
@@ -798,6 +832,16 @@ python app.py
 - Open browser and navigate to: `http://localhost:5000`
 - For HTTPS (recommended): `https://localhost:5001`
 
+### HTTPS & Browser Trust
+
+This app generates a self‑signed certificate on first run (via `pyOpenSSL`) so the Web Crypto API can operate over HTTPS.
+
+- When visiting `https://localhost:5001` you may see a browser warning.
+- Proceed to the site and accept the certificate for local development.
+- If the page shows a Web Crypto warning, reload after trusting the certificate.
+
+Change the maximum upload size (images) by adjusting `max_http_buffer_size` in `app.py` (default: 10 MB).
+
 ### Requirements
 
 Create `requirements.txt`:
@@ -838,6 +882,20 @@ python-socketio==5.10.0
 - ✅ Connected: Ready to send messages
 - ❌ Failed: Connection error
 
+### Group Chat
+
+- Click the group icon and choose “New Group”.
+- Select members (they must be online so their public keys are available).
+- The app generates a group key and securely distributes it to members.
+- Select the group from the sidebar to send and receive group messages.
+
+### Sending Images (Direct & Group)
+
+- Click the paperclip icon → choose an image.
+- Optionally add a caption in the message box.
+- Click Send. The image is encrypted client‑side (like text messages).
+- Images and captions work in both 1:1 and group chats.
+
 ---
 
 ## 📁 Project Structure
@@ -860,6 +918,7 @@ post-quantum-whatsapp/
 │   ├── js/
 │   │   ├── chat_app.js            # Main application controller
 │   │   ├── chat_handler.js        # Message protocol handler
+│   │   ├── group_manager.js       # Group creation, key distribution, group messaging
 │   │   ├── secure_channel_manager.js  # Cryptographic operations
 │   │   ├── socket_handler.js      # WebSocket communication
 │   │   └── mlkem.min.js           # ML-KEM library
@@ -929,6 +988,13 @@ For production deployment, consider:
 7. **Input Validation**: Sanitize all user inputs
 8. **Session Management**: Implement proper session timeouts
 
+### Troubleshooting
+
+- **Web Crypto API not available**: Use `https://localhost:5001` and accept the self‑signed cert. HTTP pages block `crypto.subtle`.
+- **Image fails to send**: Check size (default 10 MB). Increase `max_http_buffer_size` in `app.py` if needed.
+- **Group chat shows no messages**: Wait for the group key to arrive (admin distributes it). You’ll see a prompt when the key is decrypted.
+- **Peers missing from list**: They must finish registration and publish their public key before secure channels can be established.
+
 ---
 
 ## 🤝 Contributing
@@ -937,12 +1003,13 @@ Contributions are welcome! Areas for improvement:
 
 - Add user authentication system
 - Implement key persistence and identity management
-- Add group chat functionality
 - Implement perfect forward secrecy with key rotation
-- Add file/image sharing with encryption
+- Add voice/video calling
+- Enhance media handling (video/documents) with encryption
 - Create mobile app version
 - Add typing indicators and read receipts
 - Implement offline message queuing
+- Add message search and per‑chat key rotation controls
 
 ---
 

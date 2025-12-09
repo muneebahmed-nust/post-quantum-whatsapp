@@ -386,7 +386,24 @@ if __name__ == "__main__":
     # port=5001 is the listening port
     # debug=True enables auto-reload and detailed error messages
     # certfile and keyfile enable HTTPS (required for Web Crypto API)
-    print("https://127.0.0.1:5001")
+    
+    # Get and display local IPv4 address
+    import socket
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        print(f"\n{'='*60}")
+        print("🌐 Server is running and accessible at:")
+        print(f"   Local:   https://127.0.0.1:5001")
+        print(f"   Network: https://{local_ip}:5001")
+        print(f"{'='*60}\n")
+        print("⚠️  Note: You'll need to accept the self-signed certificate")
+        print("    in your browser when connecting.\n")
+    except:
+        print("https://127.0.0.1:5001")
+    
     socketio.run(app, host="0.0.0.0", port=5001, debug=True, 
                  certfile=cert_file, keyfile=key_file)
     
