@@ -135,8 +135,12 @@ class ChatApp {
             }
         });
         this.msgInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter' && !this.pendingImage) {
-                this.sendMessage();
+            if (e.key === 'Enter') {
+                if (this.pendingImage) {
+                    this.sendPendingImage();
+                } else {
+                    this.sendMessage();
+                }
             }
         });
         console.log('✅ Event listeners attached');
@@ -878,6 +882,11 @@ class ChatApp {
         this.previewImage.src = base64Image;
         this.previewFilename.textContent = filename;
         this.imagePreviewArea.style.display = 'flex';
+        
+        // Focus on message input so user can add caption and press Enter to send
+        setTimeout(() => {
+            this.msgInput.focus();
+        }, 100);
     }
 
     clearImagePreview() {
