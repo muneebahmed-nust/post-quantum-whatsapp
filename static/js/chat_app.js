@@ -879,9 +879,12 @@ class ChatApp {
     }
 
     showImagePreview(base64Image, filename) {
+        console.log('📷 Showing image preview:', filename);
         this.previewImage.src = base64Image;
         this.previewFilename.textContent = filename;
         this.imagePreviewArea.style.display = 'flex';
+        console.log('✅ Image preview display set to flex');
+        console.log('Preview area:', this.imagePreviewArea);
         
         // Focus on message input so user can add caption and press Enter to send
         setTimeout(() => {
