@@ -1012,6 +1012,12 @@ class ChatApp {
         senderDiv.className = 'message-sender';
         senderDiv.textContent = sender;
         
+        // Image container with action buttons
+        const imageContainer = document.createElement('div');
+        imageContainer.className = 'image-container';
+        imageContainer.style.position = 'relative';
+        imageContainer.style.display = 'inline-block';
+        
         const img = document.createElement('img');
         img.className = 'message-image';
         img.src = base64Image;
@@ -1020,6 +1026,114 @@ class ChatApp {
         img.addEventListener('click', () => {
             window.open(base64Image, '_blank');
         });
+        
+        // Action buttons container
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'image-actions';
+        actionsDiv.style.position = 'absolute';
+        actionsDiv.style.top = '8px';
+        actionsDiv.style.right = '8px';
+        actionsDiv.style.display = 'flex';
+        actionsDiv.style.gap = '6px';
+        actionsDiv.style.opacity = '0';
+        actionsDiv.style.transition = 'opacity 0.2s';
+        
+        // Show buttons on hover
+        imageContainer.addEventListener('mouseenter', () => {
+            actionsDiv.style.opacity = '1';
+        });
+        imageContainer.addEventListener('mouseleave', () => {
+            actionsDiv.style.opacity = '0';
+        });
+        
+        // Copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'image-action-btn';
+        copyBtn.title = 'Copy image';
+        copyBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+        </svg>`;
+        copyBtn.style.background = 'rgba(0, 0, 0, 0.6)';
+        copyBtn.style.border = 'none';
+        copyBtn.style.borderRadius = '4px';
+        copyBtn.style.padding = '6px';
+        copyBtn.style.cursor = 'pointer';
+        copyBtn.style.color = 'white';
+        copyBtn.style.display = 'flex';
+        copyBtn.style.alignItems = 'center';
+        copyBtn.style.justifyContent = 'center';
+        
+        copyBtn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            try {
+                const blob = await fetch(base64Image).then(r => r.blob());
+                await navigator.clipboard.write([
+                    new ClipboardItem({ [blob.type]: blob })
+                ]);
+                
+                // Visual feedback
+                copyBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                </svg>`;
+                copyBtn.style.background = 'rgba(0, 200, 0, 0.8)';
+                
+                setTimeout(() => {
+                    copyBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/>
+                    </svg>`;
+                    copyBtn.style.background = 'rgba(0, 0, 0, 0.6)';
+                }, 1500);
+            } catch (err) {
+                console.error('Failed to copy image:', err);
+                alert('Failed to copy image to clipboard');
+            }
+        });
+        
+        // Download button
+        const downloadBtn = document.createElement('button');
+        downloadBtn.className = 'image-action-btn';
+        downloadBtn.title = 'Download image';
+        downloadBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+        </svg>`;
+        downloadBtn.style.background = 'rgba(0, 0, 0, 0.6)';
+        downloadBtn.style.border = 'none';
+        downloadBtn.style.borderRadius = '4px';
+        downloadBtn.style.padding = '6px';
+        downloadBtn.style.cursor = 'pointer';
+        downloadBtn.style.color = 'white';
+        downloadBtn.style.display = 'flex';
+        downloadBtn.style.alignItems = 'center';
+        downloadBtn.style.justifyContent = 'center';
+        
+        downloadBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const link = document.createElement('a');
+            link.href = base64Image;
+            link.download = `image_${new Date().getTime()}.png`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            // Visual feedback
+            downloadBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+            </svg>`;
+            downloadBtn.style.background = 'rgba(0, 200, 0, 0.8)';
+            
+            setTimeout(() => {
+                downloadBtn.innerHTML = `<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/>
+                </svg>`;
+                downloadBtn.style.background = 'rgba(0, 0, 0, 0.6)';
+            }, 1500);
+        });
+        
+        actionsDiv.appendChild(copyBtn);
+        actionsDiv.appendChild(downloadBtn);
+        
+        imageContainer.appendChild(img);
+        imageContainer.appendChild(actionsDiv);
         
         contentDiv.appendChild(senderDiv);
         
@@ -1031,7 +1145,7 @@ class ChatApp {
             contentDiv.appendChild(captionDiv);
         }
         
-        contentDiv.appendChild(img);
+        contentDiv.appendChild(imageContainer);
         
         const timeDiv = document.createElement('div');
         timeDiv.className = 'message-time';
