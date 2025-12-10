@@ -714,8 +714,17 @@ class ChatApp {
                 textContextMenu.style.display = 'none';
             } else {
                 // Position the menu near the message
-                const rect = messageDiv.getBoundingClientRect();
-                textContextMenu.style.left = `${rect.right - 150}px`;
+                const rect = contentDiv.getBoundingClientRect();
+                const menuWidth = 150;
+                
+                // Position based on whether message is sent or received
+                if (isSent) {
+                    // For sent messages (right side), position menu to the left of the message
+                    textContextMenu.style.left = `${rect.right - menuWidth}px`;
+                } else {
+                    // For received messages (left side), position menu to the right of the message start
+                    textContextMenu.style.left = `${rect.left}px`;
+                }
                 textContextMenu.style.top = `${rect.top + window.scrollY}px`;
                 textContextMenu.style.display = 'block';
             }
