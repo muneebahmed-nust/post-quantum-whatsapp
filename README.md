@@ -32,11 +32,15 @@ Quanta provides WhatsApp-like user interface with military-grade encryption that
 - 🛡️ **Post-Quantum Security**: Uses NIST-standardized ML-KEM-512 (Kyber) algorithm
 - 🔒 **End-to-End Encryption**: Messages encrypted with AES-256-GCM
 - ⚡ **Real-time Communication**: Built on WebSocket (Socket.IO) for instant messaging
-- 💬 **Modern UI**: Clean, responsive WhatsApp-inspired interface
+- 💬 **Modern UI**: Clean, responsive WhatsApp-inspired dark theme interface
 - 🔍 **User Search**: Find and connect with online users easily
-- 📱 **Tab System**: Separate views for active chats and all users
-- 👥 **Group Chat**: Create groups, distribute keys securely, and chat with multiple members in real time
-- 🖼️ **Encrypted Images**: Share images (with optional captions) in 1:1 and group chats, encrypted end‑to‑end
+- 📱 **Tab System**: Separate views for active chats, groups, and all users
+- 👥 **Group Chat**: Create groups, distribute keys securely using ML-KEM, and chat with multiple members in real time
+- 🖼️ **Encrypted Image Sharing**: Share images with optional captions in both 1:1 and group chats, all encrypted end-to-end
+- 🔐 **Secure Key Distribution**: ML-KEM-based key encapsulation for both peer-to-peer and group communications
+- 📊 **Unread Message Badges**: Visual indicators for new messages
+- 🎨 **Context Menus**: Right-click functionality for copying text and downloading images
+- 📱 **Responsive Design**: Adapts to different screen sizes
 
 ---
 
@@ -109,17 +113,27 @@ The application follows a **client-server architecture** with end-to-end encrypt
 - **python-socketio** - Socket.IO server implementation
 
 ### Frontend
-- **HTML5/CSS3** - User interface
-- **JavaScript (ES6 Modules)** - Client-side logic
-- **Socket.IO Client** - Real-time communication
-- **Web Crypto API** - Browser cryptographic operations
-- **ML-KEM JavaScript Library** - Post-quantum key exchange
-- **Group Chat Manager** - Client-side group lifecycle and messaging
+- **HTML5/CSS3** - User interface with dark theme styling
+- **JavaScript (ES6 Modules)** - Client-side logic with modular architecture
+- **Socket.IO Client** - Real-time bidirectional communication
+- **Web Crypto API** - Browser-native cryptographic operations
+- **ML-KEM JavaScript Library** (mlkem.min.js) - Post-quantum key exchange implementation
+
+### JavaScript Modules
+- **chat_app.js** - Main application controller, UI management, and event handling
+- **chat_handler.js** - Message protocol handler and encryption orchestration
+- **secure_channel_manager.js** - Core cryptographic operations (ML-KEM & AES-GCM)
+- **socket_handler.js** - WebSocket communication layer
+- **group_manager.js** - Group lifecycle, key distribution, and group messaging
+- **message.js** - Message object model with support for text and image content
+- **chat.js** - Chat object model for managing conversation history
 
 ### Cryptography
-- **ML-KEM-512 (Kyber)** - Post-quantum key encapsulation
-- **AES-256-GCM** - Symmetric encryption
-- **Base64 Encoding** - Binary data transmission
+- **ML-KEM-512 (Kyber)** - NIST-standardized post-quantum key encapsulation mechanism
+- **AES-256-GCM** - Authenticated symmetric encryption for message confidentiality and integrity
+- **SHA-256** - Cryptographic hashing for group ID generation
+- **Base64 Encoding** - Binary data encoding for network transmission
+- **Web Crypto API** - Secure, browser-native implementation of cryptographic primitives
 
 ---
 
