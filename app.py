@@ -28,6 +28,12 @@ def index():
     # Render and return the chat.html template to the client
     return render_template("chat.html")
 
+# Route handler for brute force attack demonstration
+@app.route("/brute-force")
+def brute_force_demo():
+    # Render and return the brute force demonstration page
+    return render_template("brute_force.html")
+
 # Helper function to broadcast the current user list to all connected clients
 def broadcast_user_list():
     """Send updated user list (username -> socket_id mapping) to all clients"""

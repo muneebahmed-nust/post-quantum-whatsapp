@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML-KEM-512 Brute Force Attack Demonstration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #252525;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #c41e3a 0%, #a01830 100%);
+            padding: 30px;
+            text-align: center;
+            border-bottom: 3px solid #ff1744;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .warning {
+            background: #ff9800;
+            color: #000;
+            padding: 15px;
+            text-align: center;
+            font-weight: bold;
+            border-left: 5px solid #f57c00;
+        }
+
+        .controls {
+            padding: 30px;
+            text-align: center;
+            border-bottom: 1px solid #3d3d3d;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #00c853 0%, #00a843 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(0, 200, 83, 0.4);
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 200, 83, 0.6);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .output-section {
+            padding: 30px;
+        }
+
+        .output-section h2 {
+            margin-bottom: 20px;
+            color: #00c853;
+            border-bottom: 2px solid #00c853;
+            padding-bottom: 10px;
+        }
+
+        #console-output {
+            background: #1a1a1a;
+            border: 2px solid #3d3d3d;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 400px;
+            max-height: 600px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .log-line {
+            margin: 5px 0;
+            padding: 3px 0;
+        }
+
+        .log-info { color: #29b6f6; }
+        .log-success { color: #00c853; }
+        .log-warning { color: #ff9800; }
+        .log-error { color: #ff1744; }
+        .log-attack { color: #ab47bc; }
+        .log-crypto { color: #ffd700; }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .result-card {
+            background: #1a1a1a;
+            border: 2px solid #3d3d3d;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .result-card h3 {
+            color: #00c853;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .result-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: #2d2d2d;
+            border-radius: 4px;
+        }
+
+        .result-label {
+            color: #888;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .result-value {
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            word-break: break-all;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #00c853;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.1em;
+        }
+
+        .status.running {
+            border: 2px solid #ff9800;
+            color: #ff9800;
+        }
+
+        .status.complete {
+            border: 2px solid #00c853;
+            color: #00c853;
+        }
+
+        .status.error {
+            border: 2px solid #ff1744;
+            color: #ff1744;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin: 20px 30px;
+            color: #29b6f6;
+            text-decoration: none;
+            font-size: 1em;
+            transition: color 0.3s ease;
+        }
+
+        .back-link:hover {
+            color: #00c853;
+        }
+
+        /* Scrollbar styling */
+        #console-output::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        #console-output::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        #console-output::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 5px;
+        }
+
+        #console-output::-webkit-scrollbar-thumb:hover {
+            background: #777;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 ML-KEM-512 Brute Force Attack Demonstration</h1>
+            <p>Post-Quantum Cryptography Security Analysis</p>
+        </div>
+
+        <div class="warning">
+            ⚠️ WARNING: This is for educational purposes only! This demonstrates the computational infeasibility of attacking ML-KEM-512.
+        </div>
+
+        <a href="/" class="back-link">← Back to Chat</a>
+
+        <div class="controls">
+            <button id="run-btn" class="btn" onclick="runDemo()">
+                🚀 Start Brute Force Attack Demo
+            </button>
+            <div id="status-display"></div>
+        </div>
+
+        <div class="output-section">
+            <h2>📊 Console Output</h2>
+            <div id="console-output"></div>
+        </div>
+
+        <div class="output-section" id="results-section" style="display: none;">
+            <h2>📈 Attack Results Summary</h2>
+            <div class="results-grid">
+                <div class="result-card">
+                    <h3>🔐 Encrypted Data</h3>
+                    <div class="result-item">
+                        <div class="result-label">Kyber Ciphertext (Base64):</div>
+                        <div class="result-value" id="ciphertext-display"></div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Shared Secret (Hex):</div>
+                        <div class="result-value" id="secret-display"></div>
+                    </div>
+                </div>
+
+                <div class="result-card">
+                    <h3>⚔️ Attack Statistics</h3>
+                    <div class="result-item">
+                        <div class="result-label">Attack #1 Attempts:</div>
+                        <div class="result-value" id="attack1-attempts"></div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Attack #2 Attempts:</div>
+                        <div class="result-value" id="attack2-attempts"></div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Result:</div>
+                        <div class="result-value" style="color: #ff1744; font-weight: bold;">❌ BOTH ATTACKS FAILED</div>
+                    </div>
+                </div>
+
+                <div class="result-card">
+                    <h3>🔑 Key Information</h3>
+                    <div class="result-item">
+                        <div class="result-label">Public Key Size:</div>
+                        <div class="result-value" id="pubkey-size"></div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Private Key Size:</div>
+                        <div class="result-value" id="privkey-size"></div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Security Level:</div>
+                        <div class="result-value" style="color: #00c853; font-weight: bold;">128-bit (Post-Quantum)</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { BruteForceDemo } from '/static/js/brute_force_attack_demo.js';
+
+        const consoleOutput = document.getElementById('console-output');
+        const runBtn = document.getElementById('run-btn');
+        const statusDisplay = document.getElementById('status-display');
+        const resultsSection = document.getElementById('results-section');
+
+        // Override console.log to capture output
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            
+            const message = args.join(' ');
+            const logLine = document.createElement('div');
+            logLine.className = 'log-line';
+            
+            // Determine log type based on emoji/prefix
+            if (message.includes('✅') || message.includes('SUCCESS')) {
+                logLine.className += ' log-success';
+            } else if (message.includes('❌') || message.includes('FAILED')) {
+                logLine.className += ' log-error';
+            } else if (message.includes('⚠️') || message.includes('WARNING')) {
+                logLine.className += ' log-warning';
+            } else if (message.includes('⚔️') || message.includes('ATTACK')) {
+                logLine.className += ' log-attack';
+            } else if (message.includes('🔐') || message.includes('🔑')) {
+                logLine.className += ' log-crypto';
+            } else {
+                logLine.className += ' log-info';
+            }
+            
+            logLine.textContent = message;
+            consoleOutput.appendChild(logLine);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        };
+
+        window.runDemo = async function() {
+            try {
+                // Clear previous output
+                consoleOutput.innerHTML = '';
+                resultsSection.style.display = 'none';
+                
+                // Disable button and show status
+                runBtn.disabled = true;
+                runBtn.innerHTML = '⏳ Running Attack... <span class="spinner"></span>';
+                
+                statusDisplay.innerHTML = '<div class="status running">🔄 Brute force attacks in progress...</div>';
+                
+                // Run the demo
+                const demo = new BruteForceDemo();
+                const results = await demo.run();
+                
+                // Display results
+                document.getElementById('ciphertext-display').textContent = results.ciphertextB64.substring(0, 100) + '...';
+                document.getElementById('secret-display').textContent = results.sharedSecretHex.substring(0, 32) + '...' + results.sharedSecretHex.substring(results.sharedSecretHex.length - 32);
+                document.getElementById('attack1-attempts').textContent = results.attack1Attempts.toLocaleString();
+                document.getElementById('attack2-attempts').textContent = results.attack2Attempts.toLocaleString();
+                document.getElementById('pubkey-size').textContent = results.publicKeyLength + ' bytes';
+                document.getElementById('privkey-size').textContent = results.privateKeyLength + ' bytes';
+                
+                resultsSection.style.display = 'block';
+                
+                // Update status
+                statusDisplay.innerHTML = '<div class="status complete">✅ Demonstration Complete! All attacks failed as expected.</div>';
+                runBtn.innerHTML = '🔄 Run Again';
+                runBtn.disabled = false;
+                
+            } catch (error) {
+                console.log('❌ Error running demo: ' + error.message);
+                console.error(error);
+                statusDisplay.innerHTML = '<div class="status error">❌ Error: ' + error.message + '</div>';
+                runBtn.innerHTML = '🔄 Try Again';
+                runBtn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>
