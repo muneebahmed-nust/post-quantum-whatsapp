@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AES-GCM Nonce Collision Demonstration</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: #252525;
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+            overflow: hidden;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #2196F3 0%, #1976D2 100%);
+            padding: 30px;
+            text-align: center;
+            border-bottom: 3px solid #42A5F5;
+        }
+
+        .header h1 {
+            font-size: 2em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .header p {
+            font-size: 1.1em;
+            opacity: 0.95;
+        }
+
+        .info-box {
+            background: #1565C0;
+            color: white;
+            padding: 20px;
+            margin: 20px 30px;
+            border-radius: 8px;
+            border-left: 5px solid #42A5F5;
+        }
+
+        .info-box h3 {
+            margin-bottom: 10px;
+            font-size: 1.2em;
+        }
+
+        .info-box ul {
+            margin-left: 20px;
+            line-height: 1.8;
+        }
+
+        .controls {
+            padding: 30px;
+            text-align: center;
+            border-bottom: 1px solid #3d3d3d;
+        }
+
+        .control-group {
+            margin: 20px 0;
+        }
+
+        .control-group label {
+            display: block;
+            margin-bottom: 10px;
+            font-size: 1.1em;
+            color: #42A5F5;
+        }
+
+        .control-group input {
+            padding: 10px 20px;
+            font-size: 1em;
+            border: 2px solid #3d3d3d;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            border-radius: 6px;
+            width: 200px;
+            text-align: center;
+        }
+
+        .control-group input:focus {
+            outline: none;
+            border-color: #42A5F5;
+        }
+
+        .preset-buttons {
+            margin: 15px 0;
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .preset-btn {
+            background: #424242;
+            color: white;
+            border: 2px solid #555;
+            padding: 8px 16px;
+            font-size: 0.9em;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .preset-btn:hover {
+            background: #555;
+            border-color: #42A5F5;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #4CAF50 0%, #388E3C 100%);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            font-size: 1.1em;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            box-shadow: 0 4px 15px rgba(76, 175, 80, 0.4);
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(76, 175, 80, 0.6);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+            box-shadow: none;
+        }
+
+        .output-section {
+            padding: 30px;
+        }
+
+        .output-section h2 {
+            margin-bottom: 20px;
+            color: #42A5F5;
+            border-bottom: 2px solid #42A5F5;
+            padding-bottom: 10px;
+        }
+
+        #console-output {
+            background: #1a1a1a;
+            border: 2px solid #3d3d3d;
+            border-radius: 8px;
+            padding: 20px;
+            min-height: 400px;
+            max-height: 600px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            line-height: 1.6;
+        }
+
+        .log-line {
+            margin: 5px 0;
+            padding: 3px 0;
+        }
+
+        .log-info { color: #29b6f6; }
+        .log-success { color: #4CAF50; }
+        .log-warning { color: #ff9800; }
+        .log-error { color: #ff1744; }
+        .log-crypto { color: #ffd700; }
+        .log-test { color: #9C27B0; }
+
+        .results-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .result-card {
+            background: #1a1a1a;
+            border: 2px solid #3d3d3d;
+            border-radius: 8px;
+            padding: 20px;
+        }
+
+        .result-card h3 {
+            color: #42A5F5;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+        }
+
+        .result-item {
+            margin: 10px 0;
+            padding: 10px;
+            background: #2d2d2d;
+            border-radius: 4px;
+        }
+
+        .result-label {
+            color: #888;
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .result-value {
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            font-size: 1.1em;
+            font-weight: bold;
+        }
+
+        .result-value.success {
+            color: #4CAF50;
+        }
+
+        .result-value.warning {
+            color: #ff9800;
+        }
+
+        .result-value.error {
+            color: #ff1744;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #4CAF50;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status {
+            margin-top: 20px;
+            padding: 15px;
+            background: #1a1a1a;
+            border-radius: 8px;
+            text-align: center;
+            font-size: 1.1em;
+        }
+
+        .status.running {
+            border: 2px solid #ff9800;
+            color: #ff9800;
+        }
+
+        .status.complete {
+            border: 2px solid #4CAF50;
+            color: #4CAF50;
+        }
+
+        .status.error {
+            border: 2px solid #ff1744;
+            color: #ff1744;
+        }
+
+        .back-link {
+            display: inline-block;
+            margin: 20px 30px;
+            color: #42A5F5;
+            text-decoration: none;
+            font-size: 1em;
+            transition: color 0.3s ease;
+        }
+
+        .back-link:hover {
+            color: #4CAF50;
+        }
+
+        #console-output::-webkit-scrollbar {
+            width: 10px;
+        }
+
+        #console-output::-webkit-scrollbar-track {
+            background: #1a1a1a;
+        }
+
+        #console-output::-webkit-scrollbar-thumb {
+            background: #555;
+            border-radius: 5px;
+        }
+
+        #console-output::-webkit-scrollbar-thumb:hover {
+            background: #777;
+        }
+
+        .collision-alert {
+            background: #ff1744;
+            color: white;
+            padding: 20px;
+            margin: 20px 30px;
+            border-radius: 8px;
+            font-weight: bold;
+            text-align: center;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 AES-GCM Nonce Collision Demonstration</h1>
+            <p>Testing Random Nonce Generation Security</p>
+        </div>
+
+        <div class="info-box">
+            <h3>📚 What This Demo Tests:</h3>
+            <ul>
+                <li>Generates a single AES-256 key using Web Crypto API</li>
+                <li>Creates N random 96-bit nonces (the standard size for AES-GCM)</li>
+                <li>Checks if any nonces are duplicated (collision detection)</li>
+                <li>Calculates theoretical collision probability using birthday paradox</li>
+                <li>Demonstrates why random nonces are safe for practical use</li>
+            </ul>
+        </div>
+
+        <a href="/" class="back-link">← Back to Chat</a>
+
+        <div class="controls">
+            <div class="control-group">
+                <label for="nonce-count">Number of Nonces to Generate:</label>
+                <input type="number" id="nonce-count" value="10000" min="100" max="10000000" step="1000">
+                
+                <div class="preset-buttons">
+                    <button class="preset-btn" onclick="setNonceCount(1000)">1,000</button>
+                    <button class="preset-btn" onclick="setNonceCount(10000)">10,000</button>
+                    <button class="preset-btn" onclick="setNonceCount(100000)">100,000</button>
+                    <button class="preset-btn" onclick="setNonceCount(1000000)">1,000,000</button>
+                    <button class="preset-btn" onclick="setNonceCount(10000000)">10,000,000</button>
+                </div>
+            </div>
+
+            <button id="run-btn" class="btn" onclick="runDemo()">
+                🚀 Start Nonce Collision Test
+            </button>
+            <div id="status-display"></div>
+        </div>
+
+        <div id="collision-alert" class="collision-alert">
+            🚨 COLLISION DETECTED! This is an extremely rare statistical event!
+        </div>
+
+        <div class="output-section">
+            <h2>📊 Console Output</h2>
+            <div id="console-output"></div>
+        </div>
+
+        <div class="output-section" id="results-section" style="display: none;">
+            <h2>📈 Test Results Summary</h2>
+            <div class="results-grid">
+                <div class="result-card">
+                    <h3>🎲 Generation Statistics</h3>
+                    <div class="result-item">
+                        <div class="result-label">Total Nonces Generated:</div>
+                        <div class="result-value" id="total-generated"></div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Generation Rate:</div>
+                        <div class="result-value" id="gen-rate"></div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Nonce Size:</div>
+                        <div class="result-value">96 bits (12 bytes)</div>
+                    </div>
+                </div>
+
+                <div class="result-card">
+                    <h3>🔍 Collision Detection</h3>
+                    <div class="result-item">
+                        <div class="result-label">Duplicates Found:</div>
+                        <div class="result-value" id="duplicates-found"></div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Theoretical Probability:</div>
+                        <div class="result-value" id="theory-prob"></div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Test Result:</div>
+                        <div class="result-value" id="test-result"></div>
+                    </div>
+                </div>
+
+                <div class="result-card">
+                    <h3>✅ Security Assessment</h3>
+                    <div class="result-item">
+                        <div class="result-label">Nonce Space:</div>
+                        <div class="result-value">2^96 values</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">50% Collision At:</div>
+                        <div class="result-value">~2^48 nonces</div>
+                    </div>
+                    <div class="result-item">
+                        <div class="result-label">Safety Verdict:</div>
+                        <div class="result-value success">✅ SAFE for billions of messages</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { NonceCollisionDemo } from '/static/js/nonce_collision_demo.js';
+
+        const consoleOutput = document.getElementById('console-output');
+        const runBtn = document.getElementById('run-btn');
+        const statusDisplay = document.getElementById('status-display');
+        const resultsSection = document.getElementById('results-section');
+        const collisionAlert = document.getElementById('collision-alert');
+
+        // Override console.log to capture output
+        const originalLog = console.log;
+        console.log = function(...args) {
+            originalLog.apply(console, args);
+            
+            const message = args.join(' ');
+            const logLine = document.createElement('div');
+            logLine.className = 'log-line';
+            
+            // Determine log type based on emoji/prefix
+            if (message.includes('✅') || message.includes('SUCCESS')) {
+                logLine.className += ' log-success';
+            } else if (message.includes('❌') || message.includes('FAILED') || message.includes('COLLISION')) {
+                logLine.className += ' log-error';
+            } else if (message.includes('⚠️') || message.includes('WARNING')) {
+                logLine.className += ' log-warning';
+            } else if (message.includes('🧪') || message.includes('TEST')) {
+                logLine.className += ' log-test';
+            } else if (message.includes('🔐') || message.includes('🔑')) {
+                logLine.className += ' log-crypto';
+            } else {
+                logLine.className += ' log-info';
+            }
+            
+            logLine.textContent = message;
+            consoleOutput.appendChild(logLine);
+            consoleOutput.scrollTop = consoleOutput.scrollHeight;
+        };
+
+        window.setNonceCount = function(count) {
+            document.getElementById('nonce-count').value = count;
+        };
+
+        window.runDemo = async function() {
+            try {
+                // Clear previous output
+                consoleOutput.innerHTML = '';
+                resultsSection.style.display = 'none';
+                collisionAlert.style.display = 'none';
+                
+                // Get nonce count
+                const nonceCount = parseInt(document.getElementById('nonce-count').value);
+                
+                if (nonceCount < 100 || nonceCount > 10000000) {
+                    alert('Please enter a value between 100 and 10,000,000');
+                    return;
+                }
+                
+                // Disable button and show status
+                runBtn.disabled = true;
+                runBtn.innerHTML = `⏳ Generating ${nonceCount.toLocaleString()} nonces... <span class="spinner"></span>`;
+                
+                statusDisplay.innerHTML = '<div class="status running">🔄 Test in progress...</div>';
+                
+                // Run the demo
+                const demo = new NonceCollisionDemo();
+                const results = await demo.run(nonceCount);
+                
+                // Display results
+                document.getElementById('total-generated').textContent = results.totalGenerated.toLocaleString();
+                document.getElementById('gen-rate').textContent = `${results.generationRate.toLocaleString(undefined, {maximumFractionDigits: 0})} nonces/sec`;
+                document.getElementById('duplicates-found').textContent = results.duplicatesFound.toLocaleString();
+                document.getElementById('duplicates-found').className = 'result-value ' + (results.duplicatesFound === 0 ? 'success' : 'error');
+                document.getElementById('theory-prob').textContent = results.probability.toExponential(4);
+                
+                const testResultElem = document.getElementById('test-result');
+                if (results.duplicatesFound === 0) {
+                    testResultElem.textContent = '✅ NO COLLISIONS (Expected)';
+                    testResultElem.className = 'result-value success';
+                } else {
+                    testResultElem.textContent = `⚠️ ${results.duplicatesFound} COLLISION(S) FOUND!`;
+                    testResultElem.className = 'result-value error';
+                    collisionAlert.style.display = 'block';
+                }
+                
+                resultsSection.style.display = 'block';
+                
+                // Update status
+                statusDisplay.innerHTML = '<div class="status complete">✅ Test Complete!</div>';
+                runBtn.innerHTML = '🔄 Run Another Test';
+                runBtn.disabled = false;
+                
+            } catch (error) {
+                console.log('❌ Error running demo: ' + error.message);
+                console.error(error);
+                statusDisplay.innerHTML = '<div class="status error">❌ Error: ' + error.message + '</div>';
+                runBtn.innerHTML = '🔄 Try Again';
+                runBtn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>

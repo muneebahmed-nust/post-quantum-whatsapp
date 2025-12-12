@@ -34,6 +34,12 @@ def brute_force_demo():
     # Render and return the brute force demonstration page
     return render_template("brute_force.html")
 
+# Route handler for nonce collision demonstration
+@app.route("/nonce-demo")
+def nonce_demo():
+    # Render and return the nonce collision demonstration page
+    return render_template("nonce_demo.html")
+
 # Helper function to broadcast the current user list to all connected clients
 def broadcast_user_list():
     """Send updated user list (username -> socket_id mapping) to all clients"""
@@ -404,6 +410,10 @@ if __name__ == "__main__":
         print("🌐 Server is running and accessible at:")
         print(f"   Local:   https://127.0.0.1:5001")
         print(f"   Network: https://{local_ip}:5001")
+        print(f"{'='*60}\n")
+        print("🔐 Security Demonstrations Available:")
+        print(f"   Brute Force Attack:  https://127.0.0.1:5001/brute-force")
+        print(f"   Nonce Collision:     https://127.0.0.1:5001/nonce-demo")
         print(f"{'='*60}\n")
         print("⚠️  Note: You'll need to accept the self-signed certificate")
         print("    in your browser when connecting.\n")
