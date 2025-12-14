@@ -63,7 +63,9 @@ class BruteForceDemo {
         this.logs = [];
         this.startTime = 0;
         this.endTime = 0;
-        this.attempts = 10000;
+        this.attack1Attempts = 1000;
+        this.attack2Attempts = 10000;
+        this.cryptoData = {};
     }
 
     log(message, type = 'info') {
@@ -94,7 +96,7 @@ class BruteForceDemo {
         try {
             // ML-KEM-512 is ready to use
             this.log('✓ ML-KEM-512 initialized successfully', 'success');
-            this.log(`Brute force attempts configured: ${this.attempts}`, 'info');
+            this.log(`Brute force attempts configured: Attack 1: ${this.attack1Attempts}, Attack 2: ${this.attack2Attempts}`, 'info');
         } catch (error) {
             this.log(`✗ Initialization failed: ${error.message}`, 'error');
             throw error;
@@ -116,19 +118,27 @@ class BruteForceDemo {
         const [ciphertext, sharedSecret] = await this.mlkem.encap(encapsulationKey, seed);
         const endGen = performance.now();
         
+        // Store crypto data for later use
+        this.cryptoData = {
+            encapsulationKey,
+            decapsulationKey,
+            ciphertext,
+            sharedSecret
+        };
+        
         this.log(`✓ Encapsulation created in ${(endGen - startGen).toFixed(2)}ms`, 'success');
         this.log(`  - Ciphertext size: ${ciphertext.length} bytes`, 'info');
         this.log(`  - Shared secret size: ${sharedSecret.length} bytes`, 'info');
         this.log(`  - Shared secret (hex): ${bytesToHex(sharedSecret).substring(0, 32)}...`, 'info');
         
         this.printDivider();
-        this.log(`Starting brute force attack with ${this.attempts} attempts...`, 'warning');
+        this.log(`Starting brute force attack with ${this.attack1Attempts} attempts...`, 'warning');
         
         const attackStart = performance.now();
         let matchFound = false;
         let attemptCount = 0;
         
-        for (let i = 0; i < this.attempts; i++) {
+        for (let i = 0; i < this.attack1Attempts; i++) {
             attemptCount++;
             
             // Generate random bytes of same length as shared secret
@@ -144,7 +154,7 @@ class BruteForceDemo {
             // Progress indicator
             if ((i + 1) % 1000 === 0) {
                 const elapsed = performance.now() - attackStart;
-                this.log(`  Progress: ${i + 1}/${this.attempts} attempts (${(elapsed / 1000).toFixed(2)}s)`, 'info');
+                this.log(`  Progress: ${i + 1}/${this.attack1Attempts} attempts (${(elapsed / 1000).toFixed(2)}s)`, 'info');
             }
         }
         
@@ -193,13 +203,13 @@ class BruteForceDemo {
         this.log(`  - Original shared secret (hex): ${bytesToHex(originalSharedSecret).substring(0, 32)}...`, 'info');
         
         this.printDivider();
-        this.log(`Starting brute force decapsulation with ${this.attempts} random attempts...`, 'warning');
+        this.log(`Starting brute force decapsulation with ${this.attack2Attempts} random attempts...`, 'warning');
         
         const attackStart = performance.now();
         let correctDecryption = 0;
         let attemptCount = 0;
         
-        for (let i = 0; i < this.attempts; i++) {
+        for (let i = 0; i < this.attack2Attempts; i++) {
             attemptCount++;
             
             try {
@@ -224,7 +234,7 @@ class BruteForceDemo {
             // Progress indicator
             if ((i + 1) % 1000 === 0) {
                 const elapsed = performance.now() - attackStart;
-                this.log(`  Progress: ${i + 1}/${this.attempts} attempts (${(elapsed / 1000).toFixed(2)}s)`, 'info');
+                this.log(`  Progress: ${i + 1}/${this.attack2Attempts} attempts (${(elapsed / 1000).toFixed(2)}s)`, 'info');
             }
         }
         
@@ -310,7 +320,13 @@ class BruteForceDemo {
                 success: true,
                 results: [result1, result2],
                 totalDuration: totalDuration,
-                logs: this.logs
+                logs: this.logs,
+                ciphertextB64: arrayBufferToBase64(this.cryptoData.ciphertext),
+                sharedSecretHex: bytesToHex(new Uint8Array(this.cryptoData.sharedSecret)),
+                publicKeyLength: this.cryptoData.encapsulationKey.byteLength,
+                privateKeyLength: this.cryptoData.decapsulationKey.byteLength,
+                attack1Attempts: result1.attempts,
+                attack2Attempts: result2.attempts
             };
             
         } catch (error) {

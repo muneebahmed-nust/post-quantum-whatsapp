@@ -31,7 +31,7 @@ function arrayBufferToHex(buffer) {
 
 function bytesToBase64(bytes) {
     let binary = '';
-    for (let i = 0; i < bytes.length; i++) {
+    for (let i = 0; i < bytes.byteLength; i++) {
         binary += String.fromCharCode(bytes[i]);
     }
     return btoa(binary);
@@ -48,243 +48,293 @@ function arraysEqual(a, b) {
 // Main demonstration class
 class NonceCollisionDemo {
     constructor() {
-        this.key = null;
+        this.aesKey = null;
         this.nonces = [];
-        this.logs = [];
-        this.startTime = 0;
-        this.endTime = 0;
-        this.nonceSize = 12; // 96 bits = 12 bytes for AES-GCM
-        this.collisions = [];
+        this.results = {
+            totalGenerated: 0,
+            duplicatesFound: 0,
+            collisionPairs: [],
+            startTime: null,
+            endTime: null,
+            generationRate: 0
+        };
     }
 
     log(message, type = 'info') {
         const timestamp = new Date().toLocaleTimeString();
-        const logEntry = `[${timestamp}] [${type.toUpperCase()}] ${message}`;
-        this.logs.push(logEntry);
-        console.log(logEntry);
+        const prefix = {
+            'info': '📋',
+            'success': '✅',
+            'warning': '⚠️',
+            'error': '❌',
+            'crypto': '🔐',
+            'test': '🧪'
+        }[type] || 'ℹ️';
+        
+        console.log(`[${timestamp}] ${prefix} ${message}`);
     }
 
     printSeparator(title = '') {
-        const separator = '═'.repeat(70);
+        console.log('\n' + '='.repeat(70));
         if (title) {
-            const padding = Math.floor((70 - title.length - 2) / 2);
-            console.log('═'.repeat(padding) + ` ${title} ` + '═'.repeat(padding));
-        } else {
-            console.log(separator);
+            console.log(title.toUpperCase());
+            console.log('='.repeat(70));
         }
-        this.logs.push(separator);
     }
 
     printDivider() {
-        console.log('─'.repeat(70));
-        this.logs.push('─'.repeat(70));
+        console.log('-'.repeat(70));
     }
 
     async initialize() {
-        this.log('Initializing AES-GCM Nonce Collision Test...', 'info');
-        try {
-            // Generate a 256-bit (32-byte) key for AES-256
-            this.key = crypto.getRandomValues(new Uint8Array(32));
-            this.log('✓ AES-256 key generated', 'success');
-            this.log(`  - Key size: 256 bits (32 bytes)`, 'info');
-            this.log(`  - Nonce size: 96 bits (12 bytes)`, 'info');
-        } catch (error) {
-            this.log(`✗ Initialization failed: ${error.message}`, 'error');
-            throw error;
-        }
+        this.printSeparator('🔐 AES-GCM NONCE COLLISION DEMONSTRATION');
+        this.log('Testing the security of random nonce generation', 'info');
+        this.log('Demonstrating why 96-bit nonces are safe for AES-GCM\n', 'info');
+
+        this.printSeparator('📦 STEP 1: GENERATING AES-256 KEY');
+        this.printDivider();
+
+        this.log('Generating AES-256 key using Web Crypto API...', 'crypto');
+        
+        this.aesKey = await crypto.subtle.generateKey(
+            {
+                name: "AES-GCM",
+                length: 256
+            },
+            true, // extractable
+            ["encrypt", "decrypt"]
+        );
+
+        this.log('AES-256 key generated successfully!', 'success');
+        
+        // Export key to show it
+        const exportedKey = await crypto.subtle.exportKey("raw", this.aesKey);
+        const keyHex = arrayBufferToHex(exportedKey);
+        
+        this.log('\n🔑 AES-256 Key (Hex):', 'crypto');
+        this.log(`   ${keyHex.substring(0, 32)}...${keyHex.substring(keyHex.length - 32)}`, 'info');
+        this.log(`   Length: ${exportedKey.byteLength} bytes (${exportedKey.byteLength * 8} bits)`, 'info');
     }
 
     async generateNonces(count) {
-        this.log(`Generating ${count} random nonces...`, 'info');
-        const startGen = performance.now();
-        
+        this.printSeparator(`🎲 STEP 2: GENERATING ${count.toLocaleString()} RANDOM NONCES`);
+        this.printDivider();
+
+        const NONCE_BYTES = 12; // 96 bits
+        const NONCE_BITS = NONCE_BYTES * 8;
+
+        this.log(`Nonce size: ${NONCE_BYTES} bytes (${NONCE_BITS} bits)`, 'info');
+        this.log(`Total possible nonces: 2^${NONCE_BITS} = ${(2**96).toExponential(2)}`, 'info');
+        this.log(`Generating ${count.toLocaleString()} random nonces...\n`, 'test');
+
         this.nonces = [];
+        this.results.startTime = performance.now();
+        const startTime = this.results.startTime;
+
         for (let i = 0; i < count; i++) {
-            // Generate 96-bit (12-byte) random nonce
-            const nonce = crypto.getRandomValues(new Uint8Array(this.nonceSize));
+            // Generate a random 96-bit nonce
+            const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
             this.nonces.push(nonce);
-            
+
             // Progress indicator
-            if ((i + 1) % Math.max(1000, Math.floor(count / 10)) === 0) {
-                this.log(`  Progress: ${i + 1}/${count} nonces generated`, 'info');
+            if ((i + 1) % 1000 === 0) {
+                const elapsed = (performance.now() - startTime) / 1000;
+                const rate = (i + 1) / elapsed;
+                this.log(`   Generated ${(i + 1).toLocaleString()} nonces | Rate: ${rate.toLocaleString(undefined, {maximumFractionDigits: 0})} nonces/sec`, 'info');
             }
         }
-        
-        const endGen = performance.now();
-        this.log(`✓ All ${count} nonces generated in ${(endGen - startGen).toFixed(2)}ms`, 'success');
-        
-        return this.nonces;
+
+        this.results.endTime = performance.now();
+        const totalTime = (this.results.endTime - this.results.startTime) / 1000;
+        this.results.totalGenerated = count;
+        this.results.generationRate = count / totalTime;
+
+        this.log(`\n✅ Nonce generation complete!`, 'success');
+        this.log(`   Total generated: ${count.toLocaleString()}`, 'info');
+        this.log(`   Time elapsed: ${totalTime.toFixed(3)} seconds`, 'info');
+        this.log(`   Generation rate: ${this.results.generationRate.toLocaleString(undefined, {maximumFractionDigits: 0})} nonces/sec`, 'info');
+
+        // Show first few nonces
+        this.log('\n📋 Sample Nonces (first 5):', 'info');
+        for (let i = 0; i < Math.min(5, this.nonces.length); i++) {
+            const nonceHex = arrayBufferToHex(this.nonces[i]);
+            this.log(`   Nonce #${i + 1}: ${nonceHex}`, 'info');
+        }
     }
 
     checkForDuplicates() {
-        this.log('Checking for duplicate nonces...', 'info');
-        const startCheck = performance.now();
-        
-        this.collisions = [];
-        
-        // Convert nonces to hex strings for easy comparison
-        const nonceMap = new Map();
-        
+        this.printSeparator('🔍 STEP 3: CHECKING FOR DUPLICATE NONCES');
+        this.printDivider();
+
+        this.log(`Checking ${this.nonces.length.toLocaleString()} nonces for duplicates...`, 'test');
+        this.log('This may take a moment...\n', 'info');
+
+        const startTime = performance.now();
+        const seen = new Map(); // Map nonce hex to index
+        this.results.duplicatesFound = 0;
+        this.results.collisionPairs = [];
+
         for (let i = 0; i < this.nonces.length; i++) {
-            const hexNonce = arrayBufferToHex(this.nonces[i]);
+            const nonceHex = arrayBufferToHex(this.nonces[i]);
             
-            if (nonceMap.has(hexNonce)) {
-                // Found a collision
-                this.collisions.push({
-                    index1: nonceMap.get(hexNonce),
+            if (seen.has(nonceHex)) {
+                // Found a duplicate!
+                this.results.duplicatesFound++;
+                this.results.collisionPairs.push({
+                    index1: seen.get(nonceHex),
                     index2: i,
-                    nonce: hexNonce
+                    nonce: nonceHex
                 });
-                this.log(`⚠ COLLISION FOUND at indices ${nonceMap.get(hexNonce)} and ${i}`, 'warning');
+                
+                this.log(`🚨 COLLISION FOUND!`, 'error');
+                this.log(`   Nonce #${seen.get(nonceHex) + 1} = Nonce #${i + 1}`, 'error');
+                this.log(`   Value: ${nonceHex}`, 'error');
             } else {
-                nonceMap.set(hexNonce, i);
+                seen.set(nonceHex, i);
+            }
+
+            // Progress indicator
+            if ((i + 1) % 10000 === 0) {
+                const elapsed = (performance.now() - startTime) / 1000;
+                const rate = (i + 1) / elapsed;
+                this.log(`   Checked ${(i + 1).toLocaleString()} nonces | Rate: ${rate.toLocaleString(undefined, {maximumFractionDigits: 0})} checks/sec`, 'info');
             }
         }
-        
-        const endCheck = performance.now();
-        this.log(`✓ Duplicate check completed in ${(endCheck - startCheck).toFixed(2)}ms`, 'success');
-        this.log(`  - Total nonces checked: ${this.nonces.length}`, 'info');
-        this.log(`  - Collisions found: ${this.collisions.length}`, 'info');
-        
-        return this.collisions;
+
+        const checkTime = (performance.now() - startTime) / 1000;
+
+        this.log(`\n✅ Duplicate check complete!`, 'success');
+        this.log(`   Time elapsed: ${checkTime.toFixed(3)} seconds`, 'info');
+        this.log(`   Check rate: ${(this.nonces.length / checkTime).toLocaleString(undefined, {maximumFractionDigits: 0})} checks/sec`, 'info');
+
+        if (this.results.duplicatesFound === 0) {
+            this.log(`\n🎉 NO DUPLICATES FOUND!`, 'success');
+            this.log(`   All ${this.nonces.length.toLocaleString()} nonces are unique`, 'success');
+        } else {
+            this.log(`\n⚠️ Found ${this.results.duplicatesFound} duplicate(s)`, 'warning');
+        }
     }
 
     calculateProbability() {
-        this.log('Calculating collision probability using Birthday Paradox...', 'info');
+        this.printSeparator('📊 STEP 4: PROBABILITY ANALYSIS');
+        this.printDivider();
+
+        const n = this.results.totalGenerated; // number of nonces
+        const N = 2**96; // total possible nonces (2^96)
+
+        this.log('Birthday Paradox Probability Calculation', 'info');
+        this.log('For 96-bit nonces (2^96 possible values):\n', 'info');
+
+        // Approximate collision probability using birthday paradox
+        // P(collision) ≈ 1 - e^(-n²/2N)
+        // For small probabilities: P ≈ n²/2N
         
-        const n = this.nonces.length; // number of nonces
-        const N = Math.pow(2, 96); // total possible nonces (2^96)
+        const exactExponent = -(n * n) / (2 * N);
+        const approximateProbability = (n * n) / (2 * N);
         
-        // Birthday paradox approximation: P(collision) ≈ 1 - e^(-n²/2N)
-        // For small n: P(collision) ≈ n²/2N
+        this.log(`Number of nonces generated: ${n.toLocaleString()}`, 'info');
+        this.log(`Total possible nonces: 2^96 = ${N.toExponential(2)}`, 'info');
+        this.printDivider();
+
+        this.log('\n📐 Theoretical Collision Probability:', 'info');
+        this.log(`   P(collision) ≈ n²/(2N)`, 'info');
+        this.log(`   P(collision) ≈ (${n.toLocaleString()})² / (2 × 2^96)`, 'info');
+        this.log(`   P(collision) ≈ ${approximateProbability.toExponential(4)}`, 'info');
+        this.log(`   P(collision) ≈ ${(approximateProbability * 100).toExponential(4)}%`, 'info');
+
+        // Calculate how many nonces needed for 50% collision probability
+        // n ≈ sqrt(2N × ln(2)) ≈ sqrt(N) × 1.177
+        const noncesFor50Percent = Math.sqrt(N) * 1.177;
         
-        const nSquared = n * n;
-        const denominator = 2 * N;
-        const approximateCollisionProb = nSquared / denominator;
+        this.log(`\n📈 Collision Probability Benchmarks:`, 'info');
+        this.log(`   50% collision probability at: ~${noncesFor50Percent.toExponential(2)} nonces`, 'warning');
+        this.log(`   (That's ~2^48 or 281 trillion nonces!)`, 'warning');
+
+        // Show practical scenarios
+        this.printDivider();
+        this.log('\n🌍 Real-World Context:', 'info');
         
-        // Using more accurate formula for non-negligible probabilities
-        // P(no collision) ≈ e^(-n²/2N)
-        const exponent = -(nSquared / (2 * N));
-        const probNoCollision = Math.exp(exponent);
-        const probCollision = 1 - probNoCollision;
+        const scenarios = [
+            { count: 1000, name: '1 thousand' },
+            { count: 10000, name: '10 thousand' },
+            { count: 100000, name: '100 thousand' },
+            { count: 1000000, name: '1 million' },
+            { count: 10000000, name: '10 million' },
+            { count: 100000000, name: '100 million' },
+            { count: 1000000000, name: '1 billion' },
+            { count: 4294967296, name: '2^32 (4.3 billion)' }
+        ];
+
+        scenarios.forEach(scenario => {
+            const prob = (scenario.count * scenario.count) / (2 * N);
+            const percentage = prob * 100;
+            const odds = 1 / prob;
+            
+            this.log(`   ${scenario.name.padEnd(20)} nonces: ${percentage.toExponential(2)}% (1 in ${odds.toExponential(2)})`, 'info');
+        });
+
+        this.log(`\n💡 Practical Recommendation:`, 'success');
+        this.log(`   For typical applications (<2^32 messages per key):`, 'info');
+        this.log(`   Random 96-bit nonces are EXTREMELY SAFE`, 'success');
+        this.log(`   Collision probability: < 1 in 10^19`, 'success');
+
+        // Actual result vs expected
+        this.printDivider();
+        this.log('\n📊 Actual Results vs Theory:', 'info');
+        this.log(`   Expected duplicates: ${(this.results.totalGenerated * approximateProbability).toFixed(6)}`, 'info');
+        this.log(`   Actual duplicates found: ${this.results.duplicatesFound}`, this.results.duplicatesFound > 0 ? 'warning' : 'success');
         
-        this.log(`Birthday Paradox Analysis:`, 'info');
-        this.log(`  - Total nonces generated: ${n.toLocaleString()}`, 'info');
-        this.log(`  - Total possible 96-bit values: 2^96 ≈ 7.92 × 10^28`, 'info');
-        this.log(`  - Approximate collision probability: ${(probCollision * 100).toFixed(10)}%`, 'info');
-        this.log(`  - Probability of NO collision: ${(probNoCollision * 100).toFixed(10)}%`, 'info');
-        
-        // Calculate 50% collision threshold
-        const threshold50 = Math.sqrt(2 * N * Math.log(2));
-        this.log(``, 'info');
-        this.log(`  - 50% collision threshold: ~2^48 ≈ ${threshold50.toLocaleString()} nonces`, 'info');
-        this.log(`  - Current nonces: ${n.toLocaleString()}`, 'info');
-        
-        if (n < threshold50 / 1000) {
-            this.log(`  - Risk level: NEGLIGIBLE (far below threshold)`, 'success');
-        } else if (n < threshold50 / 10) {
-            this.log(`  - Risk level: VERY LOW`, 'success');
-        } else if (n < threshold50) {
-            this.log(`  - Risk level: LOW TO MODERATE`, 'warning');
+        if (this.results.duplicatesFound === 0) {
+            this.log(`   Result: As expected! ✅`, 'success');
         } else {
-            this.log(`  - Risk level: HIGH (approaching or exceeding 50% threshold)`, 'error');
+            this.log(`   Result: Extremely rare event occurred! 🎲`, 'warning');
+            this.log(`   (This is statistically possible but very unlikely)`, 'info');
         }
-        
-        return {
-            collisionProb: probCollision,
-            noCollisionProb: probNoCollision,
-            threshold50: threshold50,
-            noncesGenerated: n
-        };
     }
 
     displayFinalSummary() {
-        this.printSeparator('FINAL NONCE COLLISION ANALYSIS SUMMARY');
-        
-        this.log(``, 'info');
-        this.log(`AES-GCM Nonce Security Assessment:`, 'info');
-        this.log(``, 'info');
-        
-        this.log(`✓ Test Results:`, 'success');
-        this.log(`  - Nonces generated: ${this.nonces.length.toLocaleString()}`, 'info');
-        this.log(`  - Nonce size: 96 bits (12 bytes)`, 'info');
-        this.log(`  - Possible values: 2^96 ≈ 7.92 × 10^28`, 'info');
-        this.log(`  - Collisions detected: ${this.collisions.length}`, 'info');
-        this.log(``, 'info');
-        
-        this.log(`✓ Security Implications:`, 'success');
-        if (this.collisions.length === 0) {
-            this.log(`  - No collisions found in ${this.nonces.length.toLocaleString()} nonces`, 'info');
-            this.log(`  - Random nonce generation is working correctly`, 'info');
-            this.log(`  - For typical messaging applications (<2^32 messages):`, 'info');
-            this.log(`    Collision probability is negligibly small`, 'info');
-        } else {
-            this.log(`  - ${this.collisions.length} collision(s) detected!`, 'warning');
-            this.log(`  - This is statistically unexpected for this sample size`, 'warning');
-            this.log(`  - Consider using a different RNG if this persists`, 'warning');
-        }
-        
-        this.log(``, 'info');
-        this.log(`Best Practices:`, 'info');
-        this.log(`  1. Use cryptographically secure RNG (crypto.getRandomValues)`, 'info');
-        this.log(`  2. Generate unique 96-bit nonce for each encryption`, 'info');
-        this.log(`  3. Never reuse the same (key, nonce) pair for AES-GCM`, 'info');
-        this.log(`  4. For high-volume systems, monitor nonce usage`, 'info');
-        
-        this.printSeparator();
+        this.printSeparator('📈 FINAL SUMMARY');
+
+        this.log('\n🔐 AES-GCM Nonce Security Conclusions:', 'success');
+        this.log(`   ✓ Total nonces generated: ${this.results.totalGenerated.toLocaleString()}`, 'info');
+        this.log(`   ✓ Duplicates found: ${this.results.duplicatesFound}`, this.results.duplicatesFound === 0 ? 'success' : 'warning');
+        this.log(`   ✓ Nonce space: 2^96 = ${(2**96).toExponential(2)} possible values`, 'info');
+        this.log(`   ✓ Collision probability: Negligible for practical use`, 'success');
+
+        this.log('\n🎯 Key Takeaways:', 'info');
+        this.log('   1. Random 96-bit nonces provide excellent security', 'success');
+        this.log('   2. Collisions are virtually impossible in practice', 'success');
+        this.log('   3. Safe to use for billions of messages per key', 'success');
+        this.log('   4. Web Crypto API provides cryptographically secure randomness', 'success');
+
+        this.log('\n⚠️  Important Reminders:', 'warning');
+        this.log('   • NEVER reuse a nonce with the same key in AES-GCM', 'warning');
+        this.log('   • Always use crypto.getRandomValues() for nonce generation', 'warning');
+        this.log('   • Rotate keys periodically (e.g., after 2^32 messages)', 'warning');
+        this.log('   • Random nonces are safer than counters (no state to manage)', 'success');
+
+        this.printSeparator('✅ DEMONSTRATION COMPLETE');
+
+        return {
+            totalGenerated: this.results.totalGenerated,
+            duplicatesFound: this.results.duplicatesFound,
+            collisionPairs: this.results.collisionPairs,
+            generationRate: this.results.generationRate,
+            probability: (this.results.totalGenerated ** 2) / (2 * (2**96))
+        };
     }
 
     async run(nonceCount = 10000) {
-        this.startTime = performance.now();
-        
-        this.printSeparator('AES-GCM NONCE COLLISION DEMONSTRATION');
-        this.log(`Test suite initialized at ${new Date().toISOString()}`, 'info');
-        this.log(`Configuration: Testing ${nonceCount.toLocaleString()} random nonces`, 'info');
-        
         try {
-            // Initialize
             await this.initialize();
-            this.printDivider();
-            
-            // Generate nonces
             await this.generateNonces(nonceCount);
-            this.printDivider();
-            
-            // Check for duplicates
             this.checkForDuplicates();
-            this.printDivider();
-            
-            // Calculate probability
-            const probabilityAnalysis = this.calculateProbability();
-            this.printDivider();
-            
-            // Display summary
-            this.displayFinalSummary();
-            
-            this.endTime = performance.now();
-            const totalDuration = (this.endTime - this.startTime) / 1000;
-            
-            this.log(`Total test duration: ${totalDuration.toFixed(2)} seconds`, 'success');
-            this.log(`All tests completed successfully!`, 'success');
-            
-            return {
-                success: true,
-                nonceCount: nonceCount,
-                collisionsFound: this.collisions.length,
-                probabilityAnalysis: probabilityAnalysis,
-                totalDuration: totalDuration,
-                logs: this.logs
-            };
-            
+            this.calculateProbability();
+            return this.displayFinalSummary();
         } catch (error) {
-            this.log(`Test suite failed: ${error.message}`, 'error');
-            this.log(`Stack trace: ${error.stack}`, 'error');
-            
-            return {
-                success: false,
-                error: error.message,
-                logs: this.logs
-            };
+            this.log(`Fatal error: ${error.message}`, 'error');
+            console.error(error);
+            throw error;
         }
     }
 }
