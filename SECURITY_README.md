@@ -99,3 +99,295 @@ Integrity: AES-GCM prevents tampering
 Forward Secrecy (per-session secrets): New secrets can be generated for each chat
 
 Post-Quantum Safety: Secure even against future quantum computers
+
+---
+
+# 🔬 Technical Deep Dive: ML-KEM to AES Key Conversion & Data Types
+
+This section provides a detailed technical explanation of how the shared secret from ML-KEM is transformed into an AES key, along with all data type transformations throughout the security journey.
+
+## 1️⃣ Key Pair Generation (ML-KEM-512)
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  generateNewKeyPair()                                        │
+├─────────────────────────────────────────────────────────────┤
+│  Input:  None                                                │
+│  Output: [publicKey, privateKey]                             │
+│                                                              │
+│  Data Types:                                                 │
+│  • publicKey  → Uint8Array (800 bytes for ML-KEM-512)       │
+│  • privateKey → Uint8Array (1632 bytes for ML-KEM-512)      │
+└─────────────────────────────────────────────────────────────┘
+```
+
+ML-KEM-512 generates a **lattice-based** key pair resistant to quantum attacks.
+
+---
+
+## 2️⃣ Public Key Transmission
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Sending Public Key Over Network                             │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Uint8Array (800 bytes)                                      │
+│       │                                                      │
+│       ▼  arrayBufferToBase64()                               │
+│  String (Base64) ─────────────────────────► Network/Socket   │
+│       │                                                      │
+│       │  Why Base64?                                         │
+│       │  • Binary data can't travel safely over text         │
+│       │    protocols (JSON, WebSocket text frames)           │
+│       │  • Base64 encodes binary as ASCII-safe characters    │
+│       │  • ~33% size increase but guaranteed safe transport  │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 3️⃣ KEM Encapsulation (Sender Side)
+
+This is where the magic happens! The sender creates a **shared secret** using the recipient's public key:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  generateCiphertextSharedSecret(publicKeyB64)                │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Step 1: Decode public key                                   │
+│  ─────────────────────────                                   │
+│  publicKeyB64 (String)                                       │
+│       │                                                      │
+│       ▼  base64ToArrayBuffer()                               │
+│  pubkey (Uint8Array, 800 bytes)                              │
+│                                                              │
+│  Step 2: KEM Encapsulation                                   │
+│  ─────────────────────────                                   │
+│  pubkey ──────► kem.encap(pubkey)                            │
+│                      │                                       │
+│                      ▼                                       │
+│              [ciphertext, sharedSecret]                      │
+│                                                              │
+│  Output Data Types:                                          │
+│  • ciphertext   → Uint8Array (768 bytes for ML-KEM-512)     │
+│  • sharedSecret → Uint8Array (32 bytes) ◄── ALWAYS 32 BYTES!│
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Key insight**: The `sharedSecret` is **always 32 bytes (256 bits)** regardless of ML-KEM variant. This is perfect for AES-256!
+
+---
+
+## 4️⃣ Shared Secret → AES Key Conversion (The Critical Step)
+
+This is the most important transformation:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  establishSecureConnection() - The Key Conversion            │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  sharedSecret (Uint8Array, 32 bytes)                         │
+│       │                                                      │
+│       ▼                                                      │
+│  window.crypto.subtle.importKey(                             │
+│      "raw",           // Format: raw binary bytes            │
+│      sharedSecret,    // The 32-byte key material            │
+│      "AES-GCM",       // Algorithm to use                    │
+│      false,           // Not extractable (security!)         │
+│      ["encrypt", "decrypt"]  // Allowed operations           │
+│  )                                                           │
+│       │                                                      │
+│       ▼                                                      │
+│  aesKey (CryptoKey object)                                   │
+│                                                              │
+│  ┌─────────────────────────────────────────────────────┐    │
+│  │  CryptoKey {                                         │    │
+│  │    type: "secret",                                   │    │
+│  │    algorithm: { name: "AES-GCM", length: 256 },     │    │
+│  │    extractable: false,                               │    │
+│  │    usages: ["encrypt", "decrypt"]                    │    │
+│  │  }                                                   │    │
+│  └─────────────────────────────────────────────────────┘    │
+│                                                              │
+│  WHY THIS WORKS:                                             │
+│  ─────────────────                                           │
+│  • ML-KEM shared secret = 32 bytes = 256 bits               │
+│  • AES-256 needs exactly 256 bits of key material           │
+│  • Perfect match! No hashing/derivation needed              │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 5️⃣ KEM Decapsulation (Receiver Side)
+
+The receiver recovers the **same shared secret** using their private key:
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  decapsulateKey(ciphertextB64)                               │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  ciphertextB64 (String)                                      │
+│       │                                                      │
+│       ▼  base64ToArrayBuffer()                               │
+│  ciphertext (Uint8Array, 768 bytes)                          │
+│       │                                                      │
+│       ▼                                                      │
+│  kem.decap(ciphertext, this.privateKey)                      │
+│       │                                                      │
+│       ▼                                                      │
+│  sharedSecret (Uint8Array, 32 bytes)                         │
+│       │                                                      │
+│       │  SAME secret as sender computed!                     │
+│       │  This is the "magic" of KEM                          │
+│       ▼                                                      │
+│  (Convert to AES key same as sender)                         │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 6️⃣ AES-GCM Encryption
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  aesEncrypt(aesKey, plaintext)                               │
+├─────────────────────────────────────────────────────────────┤
+│                                                              │
+│  Step 1: Generate Random IV                                  │
+│  ──────────────────────────                                  │
+│  iv = crypto.getRandomValues(new Uint8Array(12))             │
+│       │                                                      │
+│       │  • 12 bytes = 96 bits (optimal for GCM)             │
+│       │  • MUST be unique per encryption                     │
+│       │  • Random is fine (not reused with same key)         │
+│                                                              │
+│  Step 2: Encode Plaintext                                    │
+│  ────────────────────────                                    │
+│  plaintext (String)                                          │
+│       │                                                      │
+│       ▼  TextEncoder.encode()                                │
+│  encoded (Uint8Array)                                        │
+│                                                              │
+│  Step 3: Encrypt                                             │
+│  ───────────────                                             │
+│  crypto.subtle.encrypt(                                      │
+│      { name: "AES-GCM", iv },                                │
+│      aesKey,      // CryptoKey                               │
+│      encoded      // Uint8Array                              │
+│  )                                                           │
+│       │                                                      │
+│       ▼                                                      │
+│  ciphertext (ArrayBuffer)                                    │
+│       │                                                      │
+│       │  Includes 16-byte authentication tag!                │
+│       │  GCM provides: Confidentiality + Integrity           │
+│                                                              │
+│  Return: { iv: Uint8Array(12), ciphertext: ArrayBuffer }     │
+│                                                              │
+└─────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 7️⃣ Complete Data Type Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    COMPLETE ENCRYPTION JOURNEY                           │
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                          │
+│  ALICE (Sender)                         BOB (Receiver)                   │
+│  ─────────────                          ──────────────                   │
+│                                                                          │
+│                    ◄──── Bob's publicKeyB64 (String) ────                │
+│                                                                          │
+│  1. Decode: String → Uint8Array(800)                                     │
+│                                                                          │
+│  2. KEM Encap:                                                           │
+│     Uint8Array(800) → [Uint8Array(768), Uint8Array(32)]                 │
+│                        ciphertext       sharedSecret                     │
+│                                                                          │
+│  3. Import Key:                                                          │
+│     Uint8Array(32) → CryptoKey                                          │
+│                                                                          │
+│  4. Encrypt Message:                                                     │
+│     String → Uint8Array → ArrayBuffer                                    │
+│     "Hello" → [72,101,108,108,111] → encrypted bytes                    │
+│                                                                          │
+│  5. Encode for transmission:                                             │
+│     ArrayBuffer → String (Base64)                                        │
+│     Uint8Array(12) → String (Base64)  // IV                             │
+│     Uint8Array(768) → String (Base64) // KEM ciphertext                 │
+│                                                                          │
+│  ═══════════════════════════════════════════════════════════════════    │
+│                         NETWORK TRANSMISSION                             │
+│                    (Everything is Base64 Strings)                        │
+│  ═══════════════════════════════════════════════════════════════════    │
+│                                                                          │
+│                                         6. Decode ciphertext:            │
+│                                            String → Uint8Array(768)      │
+│                                                                          │
+│                                         7. KEM Decap:                    │
+│                                            Uint8Array(768) +             │
+│                                            privateKey →                  │
+│                                            Uint8Array(32) sharedSecret   │
+│                                                                          │
+│                                         8. Import Key:                   │
+│                                            Uint8Array(32) → CryptoKey    │
+│                                                                          │
+│                                         9. Decrypt:                      │
+│                                            CryptoKey + IV + ciphertext   │
+│                                            → String "Hello"              │
+│                                                                          │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## 📊 Data Type Summary Table
+
+| Variable | Type | Size | Purpose |
+|----------|------|------|---------|
+| `publicKey` | `Uint8Array` | 800 bytes | ML-KEM-512 public key |
+| `privateKey` | `Uint8Array` | 1632 bytes | ML-KEM-512 private key |
+| `ciphertext` (KEM) | `Uint8Array` | 768 bytes | Encapsulated key material |
+| `sharedSecret` | `Uint8Array` | **32 bytes** | Raw key material (256 bits) |
+| `aesKey` | `CryptoKey` | N/A (opaque) | Web Crypto key object |
+| `iv` | `Uint8Array` | 12 bytes | Initialization vector |
+| `ciphertext` (AES) | `ArrayBuffer` | variable | Encrypted message + 16-byte auth tag |
+| `*B64` variants | `String` | ~33% larger | Base64 encoded for network |
+
+---
+
+## 🛡️ Security Properties Summary
+
+| Property | How It's Achieved |
+|----------|-------------------|
+| **Quantum Resistance** | ML-KEM-512 lattice-based cryptography |
+| **Confidentiality** | AES-256-GCM encryption |
+| **Integrity** | GCM authentication tag (16 bytes) |
+| **Forward Secrecy** | New KEM encapsulation per session |
+| **Key Non-extractability** | `extractable: false` in importKey |
+
+---
+
+## 🔄 Why the Shared Secret Works as an AES Key
+
+The elegance of ML-KEM's design:
+
+1. **Fixed Output Size**: ML-KEM always produces a 32-byte (256-bit) shared secret
+2. **High Entropy**: The shared secret has full cryptographic randomness
+3. **Perfect Match**: AES-256 requires exactly 256 bits of key material
+4. **No Derivation Needed**: Unlike some protocols, no additional key derivation function (KDF) is required
+5. **Direct Import**: The raw bytes can be directly imported as an AES key via Web Crypto API
+
+This makes the integration seamless and secure!
