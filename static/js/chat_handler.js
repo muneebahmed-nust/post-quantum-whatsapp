@@ -2,13 +2,13 @@ import { SocketHandler } from "./socket_handler.js";
 
 export class ChatHandler {
     constructor(userName, secureChannelManager) {
-        console.log('🎯 ChatHandler constructor called for:', userName);
+        console.log('chathandler constructor called for:', userName);
         this.secureChannelManager = secureChannelManager;
-        console.log('✅ Using provided SecureChannelManager');
+        console.log('using provided securechannelmanager');
         this.socketHandler = new SocketHandler(userName);
-        console.log('✅ SocketHandler created');
-        this.sharedSecrets = {};                  // peerSid -> AES key (CryptoKey)
-        this.messageListeners = [];               // UI or other listeners
+        console.log('sockethandler created');
+        this.sharedSecrets = {};                  // peersid -> aes key (cryptokey)
+        this.messageListeners = [];               // ui or other listeners
         this.pubKeyListeners = [];                // for when pubkey is received
 
         // Hook socket events
@@ -23,27 +23,27 @@ export class ChatHandler {
             this.pubKeyListeners.forEach(fn => fn(username, pubkeyB64));
         });
 
-        // Handle incoming KEM ciphertexts to establish shared secret
+        // handle incoming kem ciphertexts to establish shared secret
         this.socketHandler.onKEMCiphertext(async (fromUser, ciphertextB64) => {
-            console.log(`🔐 Processing KEM ciphertext from ${fromUser}`);
+            console.log(`processing kem ciphertext from ${fromUser}`);
             
-            // Check if we already have a shared secret with this user
+            // check if we already have a shared secret with this user
             if (this.sharedSecrets[fromUser]) {
-                console.log(`⚠️ Already have shared secret with ${fromUser}, skipping`);
+                console.log(`already have shared secret with ${fromUser}, skipping`);
                 return;
             }
 
             try {
-                // Decapsulate the ciphertext using our private key
+                // decapsulate the ciphertext using our private key
                 const ciphertext = this.secureChannelManager.base64ToArrayBuffer(ciphertextB64);
                 const sharedSecret = await this.secureChannelManager.kem.decap(
                     ciphertext,
                     this.secureChannelManager.privateKey
                 );
                 
-                console.log('🔑 Decapsulated shared secret, length:', sharedSecret?.length);
+                console.log('decapsulated shared secret, length:', sharedSecret?.length);
                 
-                // Import the shared secret as an AES-GCM key
+                // import the shared secret as an aes-gcm key
                 const aesKey = await window.crypto.subtle.importKey(
                     "raw",
                     sharedSecret,
@@ -52,11 +52,11 @@ export class ChatHandler {
                     ["encrypt", "decrypt"]
                 );
                 
-                // Store the AES key
+                // store the aes key
                 this.addSharedSecret(fromUser, aesKey);
-                console.log(`✅ Shared secret established with ${fromUser}`);
+                console.log(`shared secret established with ${fromUser}`);
             } catch (err) {
-                console.error(`❌ Failed to process KEM ciphertext from ${fromUser}:`, err);
+                console.error(`failed to process kem ciphertext from ${fromUser}:`, err);
             }
         });
     }
@@ -76,8 +76,8 @@ export class ChatHandler {
     async sendMessage(toUser, text) {
         let aes = this.sharedSecrets[toUser];
         if (!aes) {
-            console.warn(`⚠️ No AES key yet for ${toUser}`);
-            // Optionally: request public key here to start handshake
+            console.warn(`no aes key yet for ${toUser}`);
+            // optionally: request public key here to start handshake
             this.socketHandler.requestPubKey(toUser);
             return;
         }
@@ -95,7 +95,7 @@ export class ChatHandler {
     async receiveMessage(fromUser, payload) {
         const aes = this.sharedSecrets[fromUser];
         if (!aes) {
-            console.warn(`⚠️ Received message from ${fromUser} but no AES key yet`);
+            console.warn(`received message from ${fromUser} but no aes key yet`);
             return null;
         }
         const iv = this.secureChannelManager.base64ToArrayBuffer(payload.iv);
@@ -110,26 +110,26 @@ export class ChatHandler {
 
     /** Send this user's public key to the server */
     sendPublicKeyToServer(username) {
-        console.log('🔑 ChatHandler: Preparing to send public key...');
+        console.log('chathandler: preparing to send public key...');
         const pubkeyB64 = this.secureChannelManager.encodeForTransmission(
             this.secureChannelManager.publicKey
         );
 
         console.log(pubkeyB64)
-        console.log('🔑 Public key encoded, length:', pubkeyB64.length);
-        console.log('📤 Emitting pubkey event to server...');
+        console.log('public key encoded, length:', pubkeyB64.length);
+        console.log('emitting pubkey event to server...');
         this.socketHandler.socket.emit('pubkey', {
             name: username,
             pubkey: pubkeyB64
         });
-        console.log('📡 Public key sent to server');
+        console.log('public key sent to server');
     }
 
 
     async makeConnectionRequest(targetUserName, timeoutMs = 10000) {
-        // Check if we already have a shared secret with this user
+        // check if we already have a shared secret with this user
         if (this.sharedSecrets[targetUserName]) {
-            console.log(`✅ Already have shared secret with ${targetUserName}`);
+            console.log(`already have shared secret with ${targetUserName}`);
             return true;
         }
 
@@ -165,24 +165,24 @@ export class ChatHandler {
         });
 
         if (!pubkey) {
-            console.error(`❌ Failed to get public key for ${targetUserName}`);
+            console.error(`failed to get public key for ${targetUserName}`);
             return false;
         }
 
         try {
-            // Establish secure connection (KEM encapsulation + AES key import)
+            // establish secure connection (kem encapsulation + aes key import)
             const { ciphertextB64, aesKey } = await this.secureChannelManager.establishSecureConnection(pubkey);
             
-            // Send the KEM ciphertext to establish shared key
+            // send the kem ciphertext to establish shared key
             this.socketHandler.sendKEMCiphertext(targetUserName, ciphertextB64);
             
-            // Store the AES key
+            // store the aes key
             this.addSharedSecret(targetUserName, aesKey);
             
-            console.log(`✅ Connection established with ${targetUserName}`);
+            console.log(`connection established with ${targetUserName}`);
             return true;
         } catch (err) {
-            console.error(`❌ Failed to establish connection with ${targetUserName}:`, err);
+            console.error(`failed to establish connection with ${targetUserName}:`, err);
             return false;
         }
     }

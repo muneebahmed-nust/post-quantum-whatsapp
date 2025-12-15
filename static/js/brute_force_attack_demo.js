@@ -12,7 +12,6 @@
  * 
  * Uses the REAL ML-KEM-512 implementation from mlkem.min.js
  * 
- * Author: Security Research Team
  * Date: December 2025
  * ========================================================================
  */
@@ -92,13 +91,13 @@ class BruteForceDemo {
     }
 
     async initialize() {
-        this.log('Initializing ML-KEM-512 cryptographic system...', 'info');
+        this.log('initializing ml-kem-512 cryptographic system...', 'info');
         try {
-            // ML-KEM-512 is ready to use
-            this.log('✓ ML-KEM-512 initialized successfully', 'success');
-            this.log(`Brute force attempts configured: Attack 1: ${this.attack1Attempts}, Attack 2: ${this.attack2Attempts}`, 'info');
+            // ml-kem-512 is ready to use
+            this.log('ml-kem-512 initialized successfully', 'success');
+            this.log(`brute force attempts configured: attack 1: ${this.attack1Attempts}, attack 2: ${this.attack2Attempts}`, 'info');
         } catch (error) {
-            this.log(`✗ Initialization failed: ${error.message}`, 'error');
+            this.log(`initialization failed: ${error.message}`, 'error');
             throw error;
         }
     }
@@ -111,7 +110,7 @@ class BruteForceDemo {
         
         // Generate keypair
         const [encapsulationKey, decapsulationKey] = await this.mlkem.generateKeyPair();
-        this.log(`✓ Keypair generated`, 'success');
+        this.log(`keypair generated`, 'success');
         
         // Create encapsulation to get a ciphertext and shared secret
         const seed = generateRandomBytes(32);
@@ -126,10 +125,10 @@ class BruteForceDemo {
             sharedSecret
         };
         
-        this.log(`✓ Encapsulation created in ${(endGen - startGen).toFixed(2)}ms`, 'success');
-        this.log(`  - Ciphertext size: ${ciphertext.length} bytes`, 'info');
-        this.log(`  - Shared secret size: ${sharedSecret.length} bytes`, 'info');
-        this.log(`  - Shared secret (hex): ${bytesToHex(sharedSecret).substring(0, 32)}...`, 'info');
+        this.log(`encapsulation created in ${(endGen - startGen).toFixed(2)}ms`, 'success');
+        this.log(`  - ciphertext size: ${ciphertext.length} bytes`, 'info');
+        this.log(`  - shared secret size: ${sharedSecret.length} bytes`, 'info');
+        this.log(`  - shared secret (hex): ${bytesToHex(sharedSecret).substring(0, 32)}...`, 'info');
         
         this.printDivider();
         this.log(`Starting brute force attack with ${this.attack1Attempts} attempts...`, 'warning');
@@ -162,15 +161,15 @@ class BruteForceDemo {
         const attackDuration = attackEnd - attackStart;
         
         this.printDivider();
-        this.log(`✓ Attack completed in ${(attackDuration / 1000).toFixed(2)} seconds`, 'success');
-        this.log(`  - Total attempts: ${attemptCount}`, 'info');
-        this.log(`  - Match found: ${matchFound ? 'YES' : 'NO'}`, 'info');
+        this.log(`attack completed in ${(attackDuration / 1000).toFixed(2)} seconds`, 'success');
+        this.log(`  - total attempts: ${attemptCount}`, 'info');
+        this.log(`  - match found: ${matchFound ? 'yes' : 'no'}`, 'info');
         
         if (!matchFound) {
-            this.log(`  - Computational feasibility: INFEASIBLE`, 'success');
-            this.log(`    Without a match in ${attemptCount} attempts, the probability of success`, 'info');
+            this.log(`  - computational feasibility: infeasible`, 'success');
+            this.log(`    without a match in ${attemptCount} attempts, the probability of success`, 'info');
             this.log(`    is negligibly small for the full 32-byte search space.`, 'info');
-            this.log(`    Estimated attempts needed: 2^256 ≈ 1.16 × 10^77`, 'info');
+            this.log(`    estimated attempts needed: 2^256 ≈ 1.16 × 10^77`, 'info');
         }
         
         this.printDivider();
@@ -198,9 +197,9 @@ class BruteForceDemo {
         const [ciphertext, originalSharedSecret] = await this.mlkem.encap(encapsulationKey, seed);
         const endGen = performance.now();
         
-        this.log(`✓ Encapsulation created in ${(endGen - startGen).toFixed(2)}ms`, 'success');
-        this.log(`  - Ciphertext size: ${ciphertext.length} bytes`, 'info');
-        this.log(`  - Original shared secret (hex): ${bytesToHex(originalSharedSecret).substring(0, 32)}...`, 'info');
+        this.log(`encapsulation created in ${(endGen - startGen).toFixed(2)}ms`, 'success');
+        this.log(`  - ciphertext size: ${ciphertext.length} bytes`, 'info');
+        this.log(`  - original shared secret (hex): ${bytesToHex(originalSharedSecret).substring(0, 32)}...`, 'info');
         
         this.printDivider();
         this.log(`Starting brute force decapsulation with ${this.attack2Attempts} random attempts...`, 'warning');
@@ -242,14 +241,14 @@ class BruteForceDemo {
         const attackDuration = attackEnd - attackStart;
         
         this.printDivider();
-        this.log(`✓ Attack completed in ${(attackDuration / 1000).toFixed(2)} seconds`, 'success');
-        this.log(`  - Total attempts: ${attemptCount}`, 'info');
-        this.log(`  - Correct decryptions: ${correctDecryption}`, 'info');
-        this.log(`  - Success rate: ${(correctDecryption / attemptCount * 100).toFixed(6)}%`, 'info');
+        this.log(`attack completed in ${(attackDuration / 1000).toFixed(2)} seconds`, 'success');
+        this.log(`  - total attempts: ${attemptCount}`, 'info');
+        this.log(`  - correct decryptions: ${correctDecryption}`, 'info');
+        this.log(`  - success rate: ${(correctDecryption / attemptCount * 100).toFixed(6)}%`, 'info');
         
         if (correctDecryption === 0) {
-            this.log(`  - Attack result: FAILED - Ciphertext integrity protected`, 'success');
-            this.log(`    ML-KEM-512 ensures that random ciphertexts cannot be decrypted,`, 'info');
+            this.log(`  - attack result: failed - ciphertext integrity protected`, 'success');
+            this.log(`    ml-kem-512 ensures that random ciphertexts cannot be decrypted,`, 'info');
             this.log(`    preventing trivial attacks on the cryptosystem.`, 'info');
         }
         
@@ -265,29 +264,29 @@ class BruteForceDemo {
     }
 
     displayFinalSummary() {
-        this.printSeparator('FINAL SECURITY ANALYSIS SUMMARY');
+        this.printSeparator('final security analysis summary');
         
         this.log(``, 'info');
-        this.log(`Post-Quantum Cryptography (ML-KEM-512) Brute Force Resistance:`, 'info');
+        this.log(`post-quantum cryptography (ml-kem-512) brute force resistance:`, 'info');
         this.log(``, 'info');
-        this.log(`✓ Attack Vector 1: Shared Secret Guessing`, 'success');
-        this.log(`  - Infeasibility: Requires 2^256 attempts (≈10^77 operations)`, 'info');
-        this.log(`  - Current test: 10,000 attempts yielded no matches`, 'info');
-        this.log(`  - Computational cost: Modern computers cannot complete this task`, 'info');
-        this.log(``, 'info');
-        
-        this.log(`✓ Attack Vector 2: Ciphertext Manipulation`, 'success');
-        this.log(`  - Infeasibility: Random modifications cannot be decrypted correctly`, 'info');
-        this.log(`  - Current test: All modified ciphertexts failed decapsulation`, 'info');
-        this.log(`  - Security property: ML-KEM provides ciphertext authenticity`, 'info');
+        this.log(`attack vector 1: shared secret guessing`, 'success');
+        this.log(`  - infeasibility: requires 2^256 attempts (≈10^77 operations)`, 'info');
+        this.log(`  - current test: 10,000 attempts yielded no matches`, 'info');
+        this.log(`  - computational cost: modern computers cannot complete this task`, 'info');
         this.log(``, 'info');
         
-        this.log(`CONCLUSION:`, 'success');
-        this.log(`  ML-KEM-512 is resistant to brute force attacks due to:`, 'info');
-        this.log(`  1. Large keyspace (2^256 for shared secrets)`, 'info');
-        this.log(`  2. Deterministic decapsulation (incorrect keys → wrong secrets)`, 'info');
-        this.log(`  3. No feasible way to verify decryption without the key`, 'info');
-        this.log(`  4. Post-quantum hard mathematical problem (Module Learning With Errors)`, 'info');
+        this.log(`attack vector 2: ciphertext manipulation`, 'success');
+        this.log(`  - infeasibility: random modifications cannot be decrypted correctly`, 'info');
+        this.log(`  - current test: all modified ciphertexts failed decapsulation`, 'info');
+        this.log(`  - security property: ml-kem provides ciphertext authenticity`, 'info');
+        this.log(``, 'info');
+        
+        this.log(`conclusion:`, 'success');
+        this.log(`  ml-kem-512 is resistant to brute force attacks due to:`, 'info');
+        this.log(`  1. large keyspace (2^256 for shared secrets)`, 'info');
+        this.log(`  2. deterministic decapsulation (incorrect keys → wrong secrets)`, 'info');
+        this.log(`  3. no feasible way to verify decryption without the key`, 'info');
+        this.log(`  4. post-quantum hard mathematical problem (module learning with errors)`, 'info');
         
         this.printSeparator();
     }
@@ -355,5 +354,5 @@ if (typeof window !== 'undefined') {
         return await demo.run();
     };
     
-    console.log('💡 Brute Force Demo loaded! Run: window.runBruteForceDemo()');
+    console.log('brute force demo loaded! run: window.runBruteForceDemo()');
 }

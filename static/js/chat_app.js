@@ -9,9 +9,9 @@ import GroupChatManager from "./group_manager.js";
 import { Message } from "./message.js";
 import { Chat } from "./chat.js";
 
-// Check if Web Crypto API is available
+// check if web crypto api is available
 if (!window.crypto || !window.crypto.subtle) {
-    console.error("❌ Web Crypto API is not available. HTTPS or localhost required!");
+    console.error("web crypto api is not available. https or localhost required!");
     const warning = document.getElementById('crypto-warning');
     if (warning) warning.style.display = 'block';
     throw new Error("Web Crypto API not available - use HTTPS or localhost");
@@ -19,29 +19,29 @@ if (!window.crypto || !window.crypto.subtle) {
 
 class ChatApp {
     constructor() {
-        console.log('🚀 ChatApp constructor called');
+        console.log('chatapp constructor called');
         this.currentUser = null;
         this.chatHandler = null;
         this.secureChannelManager = new SecureChannelManager();
         this.groupManager = null;
         this.imageHandler = null;
         this.selectedUser = null;
-        this.selectedGroup = null; // Track selected group
-        this.chats = new Map(); // Store Chat objects per user/group
-        this.chatHistories = {}; // Store chat messages per user
-        this.unreadMessages = {}; // Track unread messages per user
-        this.allUsers = {}; // Store all online users
-        this.currentTab = 'chats'; // Track current tab: 'chats', 'groups', or 'all'
-        this.searchQuery = ''; // Track search query
-        this.isSendingImage = false; // Flag to prevent double-sending images
+        this.selectedGroup = null; // track selected group
+        this.chats = new Map(); // store chat objects per user/group
+        this.chatHistories = {}; // store chat messages per user
+        this.unreadMessages = {}; // track unread messages per user
+        this.allUsers = {}; // store all online users
+        this.currentTab = 'chats'; // track current tab: 'chats', 'groups', or 'all'
+        this.searchQuery = ''; // track search query
+        this.isSendingImage = false; // flag to prevent double-sending images
         
         this.initializeUI();
-        console.log('✅ ChatApp initialized successfully');
+        console.log('chatapp initialized successfully');
     }
 
     initializeUI() {
-        console.log('🔧 Initializing UI...');
-        // Get DOM elements
+        console.log('initializing ui...');
+        // get dom elements
         this.loginScreen = document.getElementById('login-screen');
         this.chatScreen = document.getElementById('chat-screen');
         this.usernameInput = document.getElementById('username-input');
@@ -116,14 +116,14 @@ class ChatApp {
         window.addEventListener('groupMessage', (e) => this.handleGroupMessageDisplay(e.detail));
         window.addEventListener('groupListUpdated', (e) => this.handleGroupListUpdate(e.detail));
 
-        // Event listeners
+        // event listeners
         this.loginBtn.addEventListener('click', () => {
-            console.log('🖱️ Login button clicked');
+            console.log('login button clicked');
             this.handleLogin();
         });
         this.usernameInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                console.log('⌨️ Enter key pressed on username input');
+                console.log('enter key pressed on username input');
                 this.handleLogin();
             }
         });
@@ -143,76 +143,76 @@ class ChatApp {
                 }
             }
         });
-        console.log('✅ Event listeners attached');
+        console.log('event listeners attached');
     }
 
     async handleLogin() {
-        console.log('🔐 handleLogin called');
+        console.log('handlelogin called');
         const username = this.usernameInput.value.trim();
-        console.log('👤 Username entered:', username);
+        console.log('username entered:', username);
         
         if (!username) {
-            console.warn('⚠️ No username entered');
+            console.warn('no username entered');
             alert('Please enter a username');
             return;
         }
 
-        console.log('✅ Username validated, waiting for key pair...');
+        console.log('username validated, waiting for key pair...');
         await this.secureChannelManager.keyPairReady;
-        console.log('✅ Key pair ready, creating ChatHandler...');
+        console.log('key pair ready, creating chathandler...');
         
         this.currentUser = username;
         this.chatHandler = new ChatHandler(username, this.secureChannelManager);
-        console.log('✅ ChatHandler created');
+        console.log('chathandler created');
 
-        // Initialize group manager
+        // initialize group manager
         this.groupManager = new GroupChatManager(this.secureChannelManager, this.chatHandler.socketHandler, this.currentUser);
-        console.log('✅ GroupManager initialized');
+        console.log('groupmanager initialized');
 
 
-        // Set up message listener
-        console.log('📨 Setting up message listener...');
+        // set up message listener
+        console.log('setting up message listener...');
         this.chatHandler.onMessage((fromUser, decryptedText) => {
             this.handleIncomingMessage(fromUser, decryptedText);
         });
 
-        // Listen for user list updates from server
-        console.log('👥 Setting up user list listener...');
+        // listen for user list updates from server
+        console.log('setting up user list listener...');
         this.chatHandler.socketHandler.socket.on('user_list', (userMap) => {
-            console.log('📋 User list updated:', userMap);
+            console.log('user list updated:', userMap);
             this.updateUserList(userMap);
         });
 
-        // Send public key after registration completes
-        console.log('⏳ Waiting for registration to complete...');
+        // send public key after registration completes
+        console.log('waiting for registration to complete...');
         
-        // Use a promise-based approach to wait for registration
+        // use a promise-based approach to wait for registration
         const waitForRegistration = new Promise((resolve) => {
-            // Check if already connected
+            // check if already connected
             if (this.chatHandler.socketHandler.socket.connected) {
-                console.log('🔗 Socket already connected, sending pubkey shortly...');
-                setTimeout(resolve, 200); // Small delay for registration to complete
+                console.log('socket already connected, sending pubkey shortly...');
+                setTimeout(resolve, 200); // small delay for registration to complete
             } else {
-                // Wait for connection
+                // wait for connection
                 this.chatHandler.socketHandler.socket.once('connect', () => {
-                    console.log('🔗 Socket connected, waiting for registration...');
-                    setTimeout(resolve, 200); // Small delay for registration to complete
+                    console.log('socket connected, waiting for registration...');
+                    setTimeout(resolve, 200); // small delay for registration to complete
                 });
             }
         });
         
         waitForRegistration.then(() => {
-            console.log('🔑 Sending public key via ChatHandler...');
+            console.log('sending public key via chathandler...');
             this.chatHandler.sendPublicKeyToServer(username);
         });
 
-        // Show chat screen
-        console.log('🖥️ Switching to chat screen...');
+        // show chat screen
+        console.log('switching to chat screen...');
         this.loginScreen.style.display = 'none';
         this.chatScreen.style.display = 'flex';
         this.currentUserDisplay.textContent = `Logged in as: ${username}`;
 
-        console.log(`✅ Logged in as ${username}`);
+        console.log(`logged in as ${username}`);
     }
 
     updateUserListWithUnread() {
@@ -221,14 +221,14 @@ class ChatApp {
     }
 
     updateUserList(userMap) {
-        // Store all users
+        // store all users
         this.allUsers = userMap;
         
-        // Request public keys for all new users
+        // request public keys for all new users
         if (this.chatHandler) {
             Object.keys(userMap).forEach(username => {
                 if (username !== this.currentUser && !this.secureChannelManager.hasPublicKey(username)) {
-                    console.log(`🔑 Requesting public key for ${username}`);
+                    console.log(`requesting public key for ${username}`);
                     this.chatHandler.socketHandler.requestPubKey(username);
                 }
             });
@@ -424,9 +424,9 @@ class ChatApp {
             return;
         }
 
-        // Establish connection
+        // establish connection
         this.disableMessageInput();
-        console.log(`🔄 Establishing connection with ${username}...`);
+        console.log(`establishing connection with ${username}...`);
         
         try {
             const success = await this.chatHandler.makeConnectionRequest(username);
@@ -556,7 +556,7 @@ class ChatApp {
     }
 
     handleIncomingMessage(fromUser, decryptedText) {
-        console.log(`📩 Message from ${fromUser}: ${decryptedText.substring(0, 50)}...`);
+        console.log(`message from ${fromUser}: ${decryptedText.substring(0, 50)}...`);
 
         // Try to parse as Message object
         let message;
@@ -976,18 +976,18 @@ class ChatApp {
             this.sendBtn.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>';
             this.msgInput.placeholder = 'Add a caption (optional)...';
         } catch (error) {
-            console.error('❌ Failed to process image:', error);
+            console.error('failed to process image:', error);
             alert('Failed to process image');
         }
     }
 
     showImagePreview(base64Image, filename) {
-        console.log('📷 Showing image preview:', filename);
+        console.log('showing image preview:', filename);
         this.previewImage.src = base64Image;
         this.previewFilename.textContent = filename;
         this.imagePreviewArea.style.display = 'flex';
-        console.log('✅ Image preview display set to flex');
-        console.log('Preview area:', this.imagePreviewArea);
+        console.log('image preview display set to flex');
+        console.log('preview area:', this.imagePreviewArea);
         
         // Focus on message input so user can add caption and press Enter to send
         setTimeout(() => {
@@ -1008,9 +1008,9 @@ class ChatApp {
     async sendPendingImage() {
         if (!this.pendingImage) return;
         
-        // Prevent double-sending
+        // prevent double-sending
         if (this.isSendingImage) {
-            console.log('⏳ Image is already being sent, please wait...');
+            console.log('image is already being sent, please wait...');
             return;
         }
         
@@ -1036,7 +1036,7 @@ class ChatApp {
             this.clearImagePreview();
             this.msgInput.value = '';
         } catch (error) {
-            console.error('❌ Failed to send image:', error);
+            console.error('failed to send image:', error);
             alert('Failed to send image');
         } finally {
             this.isSendingImage = false;
@@ -1064,11 +1064,11 @@ class ChatApp {
             }
             chat.addMessage(message);
 
-            // Display in own chat
+            // display in own chat
             this.displayImageInChat('You', base64Image, caption);
-            console.log(`✅ Image sent to ${username}`);
+            console.log(`image sent to ${username}`);
         } catch (error) {
-            console.error('❌ Failed to send direct image:', error);
+            console.error('failed to send direct image:', error);
             throw error;
         }
     }
@@ -1094,11 +1094,11 @@ class ChatApp {
             }
             chat.addMessage(this.currentUser, message);
 
-            // Display in own chat
+            // display in own chat
             this.displayImageInChat('You', base64Image, caption);
-            console.log(`✅ Image sent to group`);
+            console.log(`image sent to group`);
         } catch (error) {
-            console.error('❌ Failed to send group image:', error);
+            console.error('failed to send group image:', error);
             throw error;
         }
     }
@@ -1368,15 +1368,15 @@ class ChatApp {
     }
 }
 
-// Initialize the app when DOM is ready
-console.log('🔍 Waiting for DOMContentLoaded...');
+// initialize the app when dom is ready
+console.log('waiting for domcontentloaded...');
 document.addEventListener('DOMContentLoaded', () => {
-    console.log('✅ DOM Content Loaded!');
+    console.log('dom content loaded!');
     try {
         window.chatApp = new ChatApp();
-        console.log('🎉 Chat application initialized successfully');
+        console.log('chat application initialized successfully');
     } catch (error) {
-        console.error('❌ Failed to initialize chat application:', error);
+        console.error('failed to initialize chat application:', error);
     }
 });
 

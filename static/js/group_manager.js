@@ -9,33 +9,33 @@ class GroupChatManager {
     }
 
     setupEventHandlers() {
-        // Group created successfully (admin receives this)
+        // group created successfully (admin receives this)
         this.socketHandler.onGroupCreated((data) => {
-            console.log('📬 Group created:', data);
+            console.log('group created:', data);
             this.handleGroupCreated(data);
         });
 
-        // Group invitation (members receive this)
+        // group invitation (members receive this)
         this.socketHandler.onGroupInvitation((data) => {
-            console.log('📬 Group invitation:', data);
+            console.log('group invitation:', data);
             this.handleGroupInvitation(data);
         });
 
-        // Encrypted group key received
+        // encrypted group key received
         this.socketHandler.onGroupKey((data) => {
-            console.log('🔑 Received encrypted group key for:', data.group_name);
+            console.log('received encrypted group key for:', data.group_name);
             this.handleGroupKey(data);
         });
 
-        // Group message received
+        // group message received
         this.socketHandler.onGroupMessage((data) => {
-            // console.log('📨 Group message from:', data.sender, 'in', data.group_name);
+            // console.log('group message from:', data.sender, 'in', data.group_name);
             this.handleGroupMessage(data);
         });
 
-        // Group error
+        // group error
         this.socketHandler.onGroupError((data) => {
-            console.error('❌ Group error:', data.message);
+            console.error('group error:', data.message);
             alert(`Group Error: ${data.message}`);
         });
     }
@@ -50,7 +50,7 @@ class GroupChatManager {
             return;
         }
 
-        console.log(`👥 Creating group "${groupName}" with members:`, memberUsernames);
+        console.log(`creating group "${groupName}" with members:`, memberUsernames);
 
         // Verify we have public keys for all members
         for (const username of memberUsernames) {
@@ -82,7 +82,7 @@ class GroupChatManager {
             isAdmin: true
         });
 
-        console.log(`✅ Group "${name}" created with ID: ${group_id}`);
+        console.log(`group "${name}" created with id: ${group_id}`);
 
         // Encrypt and distribute group key to all members
         await this.distributeGroupKey(group_id, groupKey, members);
@@ -107,7 +107,7 @@ class GroupChatManager {
             isAdmin: false
         });
 
-        console.log(`✅ Invited to group "${name}" by ${admin}`);
+        console.log(`invited to group "${name}" by ${admin}`);
         
         // Update UI
         this.updateGroupList();
@@ -125,7 +125,7 @@ class GroupChatManager {
      * Distribute encrypted group key to all members (admin only)
      */
     async distributeGroupKey(groupId, groupKey, members) {
-        console.log(`🔑 Distributing group key to ${members.length} members`);
+        console.log(`distributing group key to ${members.length} members`);
 
         // Export group key to raw bytes
         const keyBytes = await window.crypto.subtle.exportKey("raw", groupKey);
@@ -135,16 +135,16 @@ class GroupChatManager {
 
         // Encrypt group key for each member using their ML-KEM public key
         for (const username of members) {
-            console.log(`🔍 Checking public key for ${username}`);
+            console.log(`checking public key for ${username}`);
             const peerPubKey = this.secureChannelManager.getUserPublicKey(username);
             
             if (!peerPubKey) {
-                console.warn(`⚠️ No public key for ${username}, skipping`);
-                console.log(`📋 Available public keys:`, Array.from(this.secureChannelManager.publicKeyCache.keys()));
+                console.warn(`no public key for ${username}, skipping`);
+                console.log(`available public keys:`, Array.from(this.secureChannelManager.publicKeyCache.keys()));
                 continue;
             }
             
-            console.log(`✅ Found public key for ${username}, length:`, peerPubKey.length);
+            console.log(`found public key for ${username}, length:`, peerPubKey.length);
 
             try {
                 // Use ML-KEM to encapsulate: generates ciphertext and shared secret
@@ -157,16 +157,16 @@ class GroupChatManager {
                 const combined = this.secureChannelManager.combineArrays(ciphertext, encryptedKey);
                 
                 encryptedKeys[username] = this.secureChannelManager.arrayBufferToBase64(combined);
-                console.log(`   ✅ Encrypted key for ${username}`);
+                console.log(`   encrypted key for ${username}`);
             } catch (error) {
-                console.error(`❌ Failed to encrypt key for ${username}:`, error);
+                console.error(`failed to encrypt key for ${username}:`, error);
             }
         }
 
-        // Send encrypted keys to server for distribution
+        // send encrypted keys to server for distribution
         this.socketHandler.distributeGroupKey(groupId, encryptedKeys);
 
-        console.log('✅ Group keys distributed');
+        console.log('group keys distributed');
     }
 
     /**
@@ -174,7 +174,7 @@ class GroupChatManager {
      */
     async handleGroupKey(data) {
         const { group_id, group_name, encrypted_key } = data;
-        console.log(`🔑 Received encrypted group key for "${group_name}"`);
+        console.log(`received encrypted group key for "${group_name}"`);
 
         try {
             // Decode the combined data
@@ -204,11 +204,11 @@ class GroupChatManager {
             const group = this.groups.get(group_id);
             if (group) {
                 group.key = groupKey;
-                console.log(`✅ Group key decrypted for "${group_name}"`);
+                console.log(`group key decrypted for "${group_name}"`);
                 alert(`You can now chat in group "${group_name}"`);
             }
         } catch (error) {
-            console.error('❌ Failed to decrypt group key:', error);
+            console.error('failed to decrypt group key:', error);
             alert(`Failed to decrypt group key for "${group_name}"`);
         }
     }
@@ -236,11 +236,11 @@ class GroupChatManager {
             // Send to server
             this.socketHandler.sendGroupMessage(groupId, encryptedMessage);
 
-            // Display in own chat
+            // display in own chat
             this.displayGroupMessage(groupId, this.currentUser, message);
-            console.log(`✅ Sent message to group "${group.name}"`);
+            console.log(`sent message to group "${group.name}"`);
         } catch (error) {
-            console.error('❌ Failed to send group message:', error);
+            console.error('failed to send group message:', error);
         }
     }
 
@@ -252,24 +252,24 @@ class GroupChatManager {
         const group = this.groups.get(group_id);
 
         if (!group) {
-            console.error(`❌ Cannot decrypt message: group ${group_id} not found`);
+            console.error(`cannot decrypt message: group ${group_id} not found`);
             return;
         }
 
         if (!group.key) {
-            console.warn(`⚠️ Cannot decrypt message: group key not available for "${group.name}". Key may still be arriving.`);
-            console.log(`📋 Group info:`, { name: group.name, admin: group.admin, hasKey: !!group.key });
+            console.warn(`cannot decrypt message: group key not available for "${group.name}". key may still be arriving.`);
+            console.log(`group info:`, { name: group.name, admin: group.admin, hasKey: !!group.key });
             return;
         }
 
         try {
-            // Decrypt message with group key
+            // decrypt message with group key
             const message = await this.secureChannelManager.decryptGroupMessage(encrypted_message, group.key);
 
-            // Display in chat
+            // display in chat
             this.displayGroupMessage(group_id, sender, message);
         } catch (error) {
-            console.error('❌ Failed to decrypt group message:', error);
+            console.error('failed to decrypt group message:', error);
         }
     }
 

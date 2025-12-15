@@ -16,7 +16,6 @@
  * - Birthday paradox: ~50% collision after 2^48 nonces
  * - For practical usage (<2^32 nonces), collision is negligible
  * 
- * Author: Security Research Team
  * Date: December 2025
  * ========================================================================
  */
@@ -63,13 +62,13 @@ class NonceCollisionDemo {
     log(message, type = 'info') {
         const timestamp = new Date().toLocaleTimeString();
         const prefix = {
-            'info': '📋',
-            'success': '✅',
-            'warning': '⚠️',
-            'error': '❌',
-            'crypto': '🔐',
-            'test': '🧪'
-        }[type] || 'ℹ️';
+            'info': '[info]',
+            'success': '[success]',
+            'warning': '[warning]',
+            'error': '[error]',
+            'crypto': '[crypto]',
+            'test': '[test]'
+        }[type] || '[info]';
         
         console.log(`[${timestamp}] ${prefix} ${message}`);
     }
@@ -293,27 +292,27 @@ class NonceCollisionDemo {
     }
 
     displayFinalSummary() {
-        this.printSeparator('📈 FINAL SUMMARY');
+        this.printSeparator('final summary');
 
-        this.log('\n🔐 AES-GCM Nonce Security Conclusions:', 'success');
-        this.log(`   ✓ Total nonces generated: ${this.results.totalGenerated.toLocaleString()}`, 'info');
-        this.log(`   ✓ Duplicates found: ${this.results.duplicatesFound}`, this.results.duplicatesFound === 0 ? 'success' : 'warning');
-        this.log(`   ✓ Nonce space: 2^96 = ${(2**96).toExponential(2)} possible values`, 'info');
-        this.log(`   ✓ Collision probability: Negligible for practical use`, 'success');
+        this.log('\naes-gcm nonce security conclusions:', 'success');
+        this.log(`   total nonces generated: ${this.results.totalGenerated.toLocaleString()}`, 'info');
+        this.log(`   duplicates found: ${this.results.duplicatesFound}`, this.results.duplicatesFound === 0 ? 'success' : 'warning');
+        this.log(`   nonce space: 2^96 = ${(2**96).toExponential(2)} possible values`, 'info');
+        this.log(`   collision probability: negligible for practical use`, 'success');
 
-        this.log('\n🎯 Key Takeaways:', 'info');
-        this.log('   1. Random 96-bit nonces provide excellent security', 'success');
-        this.log('   2. Collisions are virtually impossible in practice', 'success');
-        this.log('   3. Safe to use for billions of messages per key', 'success');
-        this.log('   4. Web Crypto API provides cryptographically secure randomness', 'success');
+        this.log('\nkey takeaways:', 'info');
+        this.log('   1. random 96-bit nonces provide excellent security', 'success');
+        this.log('   2. collisions are virtually impossible in practice', 'success');
+        this.log('   3. safe to use for billions of messages per key', 'success');
+        this.log('   4. web crypto api provides cryptographically secure randomness', 'success');
 
-        this.log('\n⚠️  Important Reminders:', 'warning');
-        this.log('   • NEVER reuse a nonce with the same key in AES-GCM', 'warning');
-        this.log('   • Always use crypto.getRandomValues() for nonce generation', 'warning');
-        this.log('   • Rotate keys periodically (e.g., after 2^32 messages)', 'warning');
-        this.log('   • Random nonces are safer than counters (no state to manage)', 'success');
+        this.log('\nimportant reminders:', 'warning');
+        this.log('   never reuse a nonce with the same key in aes-gcm', 'warning');
+        this.log('   always use crypto.getrandomvalues() for nonce generation', 'warning');
+        this.log('   rotate keys periodically (e.g., after 2^32 messages)', 'warning');
+        this.log('   random nonces are safer than counters (no state to manage)', 'success');
 
-        this.printSeparator('✅ DEMONSTRATION COMPLETE');
+        this.printSeparator('demonstration complete');
 
         return {
             totalGenerated: this.results.totalGenerated,
@@ -352,5 +351,5 @@ if (typeof window !== 'undefined') {
         return await demo.run(count);
     };
     
-    console.log('💡 Nonce Collision Demo loaded! Run: window.runNonceDemo(10000)');
+    console.log('nonce collision demo loaded! run: window.runNonceDemo(10000)');
 }

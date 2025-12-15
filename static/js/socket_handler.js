@@ -7,11 +7,11 @@
  */
 export class SocketHandler {
     constructor(userName) {
-        console.log('🔌 SocketHandler constructor called for:', userName);
+        console.log('sockethandler constructor called for:', userName);
         this.userName = userName;
-        console.log('🔌 Initializing socket.io connection...');
+        console.log('initializing socket.io connection...');
         this.socket = io({ autoConnect: true });
-        console.log('🔌 Socket.io initialized');
+        console.log('socket.io initialized');
         this.users = {};                // username -> socketId
         this.messageListeners = [];
         this.pubKeyListeners = [];
@@ -25,29 +25,29 @@ export class SocketHandler {
         this._setupSocketEvents();
     }
 
-    /* ------------------ Internal: Socket Events ------------------ */
+    /* internal: socket events */
     _setupSocketEvents() {
-        console.log('⚙️ Setting up socket events...');
+        console.log('setting up socket events...');
         
-        // Listen for registration confirmation BEFORE connecting
+        // listen for registration confirmation before connecting
         this.socket.on("registration_confirmed", (data) => {
-            console.log('✅ Registration confirmed by server:', data);
-            // Emit custom event that can be listened to from outside
+            console.log('registration confirmed by server:', data);
+            // emit custom event that can be listened to from outside
             this.socket.emit('_registration_ready', data);
         });
         
         this.socket.on("connect", () => {
-            console.log(`🔗 Connected as ${this.userName}, SID: ${this.socket.id}`);
+            console.log(`connected as ${this.userName}, sid: ${this.socket.id}`);
             // register this user with server
-            console.log('📤 Emitting register_user event...');
+            console.log('emitting register_user event...');
             this.socket.emit("register_user", { name: this.userName });
-            console.log('✅ register_user event sent');
+            console.log('register_user event sent');
         });
 
-        // Updated list of online users (username -> socketId)
+        // updated list of online users (username -> socketid)
         this.socket.on("user_list", (userMap) => {
             this.users = { ...userMap };
-            console.log("👥 Online users updated:", this.users);
+            console.log("online users updated:", this.users);
         });
 
         // Receive a requested public key
@@ -60,65 +60,65 @@ export class SocketHandler {
             this.messageListeners.forEach(fn => fn(from, base64Message));
         });
 
-        // Detect when server tells us someone disconnected
+        // detect when server tells us someone disconnected
         this.socket.on("user_disconnected", (username) => {
             if (this.users[username]) {
                 delete this.users[username];
-                console.log(`⚠️ User ${username} disconnected`);
+                console.log(`user ${username} disconnected`);
             }
         });
 
-        // Auto-reconnect events
+        // auto-reconnect events
         this.socket.on("reconnect", (attemptNumber) => {
-            console.log(`🔄 Reconnected after ${attemptNumber} attempts, new SID: ${this.socket.id}`);
+            console.log(`reconnected after ${attemptNumber} attempts, new sid: ${this.socket.id}`);
             this.socket.emit("register_user", { name: this.userName });
         });
 
         this.socket.on("disconnect", (reason) => {
-            console.warn(`🔌 Disconnected: ${reason}`);
+            console.warn(`disconnected: ${reason}`);
         });
 
-        // This event will be handled by chat_handler via a callback
+        // this event will be handled by chat_handler via a callback
         this.socket.on("recv_kem_ciphertext", async ({ from, ciphertext }) => {
-            console.log(`🔐 Received KEM ciphertext from ${from}`);
-            // Emit this to kemCiphertextListeners
+            console.log(`received kem ciphertext from ${from}`);
+            // emit this to kemciphertextlisteners
             this.kemCiphertextListeners.forEach(fn => fn(from, ciphertext));
         });
 
-        // Group-related socket events
+        // group-related socket events
         this.socket.on('group_created', (data) => {
-            console.log('📬 Group created:', data);
+            console.log('group created:', data);
             this.groupCreatedListeners.forEach(fn => fn(data));
         });
 
         this.socket.on('group_invitation', (data) => {
-            console.log('📬 Group invitation:', data);
+            console.log('group invitation:', data);
             this.groupInvitationListeners.forEach(fn => fn(data));
         });
 
         this.socket.on('group_key', (data) => {
-            console.log('🔑 Received encrypted group key for:', data.group_name);
+            console.log('received encrypted group key for:', data.group_name);
             this.groupKeyListeners.forEach(fn => fn(data));
         });
 
         this.socket.on('recv_group_message', (data) => {
-            // console.log('📨 Group message from:', data.sender, 'in', data.group_name);
+            // console.log('group message from:', data.sender, 'in', data.group_name);
             this.groupMessageListeners.forEach(fn => fn(data));
         });
 
         this.socket.on('group_error', (data) => {
-            console.error('❌ Group error:', data.message);
+            console.error('group error:', data.message);
             this.groupErrorListeners.forEach(fn => fn(data));
         });
     }
 
-    /* ------------------ Public API ------------------ */
+    /* public api */
 
-    /** Request public key of a specific user */
+    /** request public key of a specific user */
     requestPubKey(targetUserName) {
         const targetSocketId = this.users[targetUserName];
         if (!targetSocketId) {
-            console.warn(`⚠️ User ${targetUserName} not online`);
+            console.warn(`user ${targetUserName} not online`);
             return;
         }
         this.socket.emit("request_pubkey", { username: targetUserName });
@@ -139,33 +139,33 @@ export class SocketHandler {
         const sid = this.users[targetUserName];
         if (!sid) {
         
-            console.warn(`⚠️ Cannot send message, user ${targetUserName} not online`);
+            console.warn(`cannot send message, user ${targetUserName} not online`);
             return;
         }
         this.socket.emit("send_message", { to: sid, base64Message });
     }
 
     /**
- * Send a KEM ciphertext to a specific user
- * to establish a shared AES key.
+ * send a kem ciphertext to a specific user
+ * to establish a shared aes key.
  *
- * @param {string} targetUserName - The recipient's username
- * @param {string} ciphertextB64 - The KEM ciphertext in Base64
+ * @param {string} targetUserName - the recipient's username
+ * @param {string} ciphertextB64 - the kem ciphertext in base64
  */
 sendKEMCiphertext(targetUserName, ciphertextB64) {
     const sid = this.users[targetUserName];
     if (!sid) {
-        console.warn(`⚠️ Cannot send KEM ciphertext, user ${targetUserName} not online`);
+        console.warn(`cannot send kem ciphertext, user ${targetUserName} not online`);
         return;
     }
 
-    // Emit the ciphertext to the server, which will forward it to the peer
+    // emit the ciphertext to the server, which will forward it to the peer
     this.socket.emit("send_kem_ciphertext", {
         to: sid,
         ciphertext: ciphertextB64
     });
 
-    console.log(`🔐 KEM ciphertext sent to ${targetUserName} (SID: ${sid})`);
+    console.log(`kem ciphertext sent to ${targetUserName} (sid: ${sid})`);
 }
 
 

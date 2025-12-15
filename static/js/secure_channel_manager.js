@@ -1,8 +1,8 @@
 import { MlKem512 } from "./mlkem.min.js";
 
-// Check if Web Crypto API is available
+// check if web crypto api is available
 if (!window.crypto || !window.crypto.subtle) {
-    console.error("❌ Web Crypto API is not available. HTTPS or localhost required!");
+    console.error("web crypto api is not available. https or localhost required!");
     const warning = document.getElementById('crypto-warning');
     if (warning) warning.style.display = 'block';
     throw new Error("Web Crypto API not available - use HTTPS or localhost");
@@ -14,16 +14,16 @@ class SecureChannelManager {
         /**
          * Manages secure channels using ML-KEM and AES encryption.
          */
-        console.log('🔐 SecureChannelManager constructor called');
+        console.log('securechannelmanager constructor called');
         this.kem = new MlKem512();
-        console.log('✅ ML-KEM-512 instance created');
+        console.log('ml-kem-512 instance created');
         this.publicKey = null;
         this.privateKey = null;
-        this.publicKeyCache = new Map(); // Store other users' public keys
+        this.publicKeyCache = new Map(); // store other users' public keys
         this.keyPairReady = this.generateNewKeyPair();
-        console.log('⏳ Key pair generation started...');
+        console.log('key pair generation started...');
     }
-// Used to decode received cryptographic keys and ciphertexts
+// used to decode received cryptographic keys and ciphertexts
     base64ToArrayBuffer(b64) {
         /**
          * Converts a Base64 encoded string back to an ArrayBuffer.
@@ -55,25 +55,25 @@ arrayBufferToBase64(buf) {
         /**
          * Generates a new ML-KEM key pair and stores the public and private keys.
          */
-        console.log('🔑 Generating new ML-KEM key pair...');
+        console.log('generating new ml-kem key pair...');
         const keyPair = await this.kem.generateKeyPair();
-        console.log('📦 keyPair returned:', keyPair);
-        console.log('📦 keyPair type:', typeof keyPair);
-        console.log('📦 keyPair keys:', Object.keys(keyPair));
+        console.log('keypair returned:', keyPair);
+        console.log('keypair type:', typeof keyPair);
+        console.log('keypair keys:', Object.keys(keyPair));
         
-        // ML-KEM returns [publicKey, privateKey] as an array, not an object
+        // ml-kem returns [publicKey, privateKey] as an array, not an object
         if (Array.isArray(keyPair)) {
             [this.publicKey, this.privateKey] = keyPair;
-            console.log('✅ Extracted from array - publicKey length:', this.publicKey?.length);
-            console.log('✅ Extracted from array - privateKey length:', this.privateKey?.length);
+            console.log('extracted from array - publickey length:', this.publicKey?.length);
+            console.log('extracted from array - privatekey length:', this.privateKey?.length);
         } else {
             this.privateKey = keyPair.privateKey;
             this.publicKey = keyPair.publicKey;
-            console.log('✅ Extracted from object - publicKey:', this.publicKey);
-            console.log('✅ Extracted from object - privateKey:', this.privateKey);
+            console.log('extracted from object - publickey:', this.publicKey);
+            console.log('extracted from object - privatekey:', this.privateKey);
         }
 
-        console.log('✅ Key pair generated successfully');
+        console.log('key pair generated successfully');
     }
 
     encodeForTransmission(data) {
@@ -105,11 +105,11 @@ arrayBufferToBase64(buf) {
 
     storeUserPublicKey(username, publicKeyB64) {
         try {
-            // Store the base64 version for easier use
+            // store the base64 version for easier use
             this.publicKeyCache.set(username, publicKeyB64);
-            console.log(`🔑 Stored public key for ${username}`);
+            console.log(`stored public key for ${username}`);
         } catch (error) {
-            console.error(`❌ Failed to store public key for ${username}:`, error);
+            console.error(`failed to store public key for ${username}:`, error);
         }
     }
 
@@ -121,14 +121,14 @@ arrayBufferToBase64(buf) {
          */
         const pubkey = this.base64ToArrayBuffer(publicKey);
         const result = await this.kem.encap(pubkey);
-        console.log('🔐 encap result:', result);
-        console.log('🔐 encap result type:', typeof result, 'isArray:', Array.isArray(result));
+        console.log('encap result:', result);
+        console.log('encap result type:', typeof result, 'isArray:', Array.isArray(result));
         
-        // ML-KEM encap returns [ciphertext, sharedSecret] as an array
+        // ml-kem encap returns [ciphertext, sharedSecret] as an array
         if (Array.isArray(result)) {
             const [ciphertext, sharedSecret] = result;
-            console.log('✅ Extracted from array - ciphertext length:', ciphertext?.length);
-            console.log('✅ Extracted from array - sharedSecret length:', sharedSecret?.length);
+            console.log('extracted from array - ciphertext length:', ciphertext?.length);
+            console.log('extracted from array - sharedsecret length:', sharedSecret?.length);
             return { ciphertext, sharedSecret };
         } else {
             return result;
@@ -143,13 +143,13 @@ arrayBufferToBase64(buf) {
          * @returns {Promise<Object>} - Object containing ciphertextB64 (string) and aesKey (CryptoKey).
          */
         try {
-            // Generate ciphertext and shared secret using KEM
+            // generate ciphertext and shared secret using kem
             const { ciphertext, sharedSecret } = await this.generateCiphertextSharedSecret(publicKeyB64);
             
-            // Convert ciphertext to Base64 for transmission
+            // convert ciphertext to base64 for transmission
             const ciphertextB64 = this.arrayBufferToBase64(ciphertext);
             
-            // Import the shared secret as an AES-GCM key
+            // import the shared secret as an aes-gcm key
             const aesKey = await window.crypto.subtle.importKey(
                 "raw",
                 sharedSecret,
@@ -160,7 +160,7 @@ arrayBufferToBase64(buf) {
             
             return { ciphertextB64, aesKey };
         } catch (err) {
-            console.error("❌ Failed to establish secure connection:", err);
+            console.error("failed to establish secure connection:", err);
             throw err;
         }
     }
@@ -168,7 +168,7 @@ arrayBufferToBase64(buf) {
 
 
 
-    // ======== AES ENCRYPT/DECRYPT ========
+    // aes encrypt/decrypt
 async  aesEncrypt(aesKey, plaintext) {
     /**
      * Encrypts plaintext using AES-GCM with the provided AES key.
@@ -209,7 +209,7 @@ async  aesDecrypt(aesKey, iv, ciphertext) {
         return this.aesDecrypt(aesKey, iv, ciphertext);
     }
 
-    /* ------------------ Group Encryption Methods ------------------ */
+    /* group encryption methods */
 
     /**
      * Generate AES-256 key for group encryption
@@ -254,7 +254,7 @@ async  aesDecrypt(aesKey, iv, ciphertext) {
      * Encrypt data with shared secret (from KEM)
      */
     async encryptWithSharedSecret(data, sharedSecret) {
-        // Import shared secret as AES key
+        // import shared secret as aes key
         const key = await window.crypto.subtle.importKey(
             "raw",
             sharedSecret,
@@ -277,7 +277,7 @@ async  aesDecrypt(aesKey, iv, ciphertext) {
      * Decrypt data with shared secret
      */
     async decryptWithSharedSecret(encryptedData, sharedSecret) {
-        // Import shared secret as AES key
+        // import shared secret as aes key
         const key = await window.crypto.subtle.importKey(
             "raw",
             sharedSecret,
@@ -333,7 +333,7 @@ async  aesDecrypt(aesKey, iv, ciphertext) {
             ciphertext
         );
 
-        // Return as string if it's valid UTF-8, otherwise as bytes
+        // return as string if it's valid utf-8, otherwise as bytes
         try {
             return new TextDecoder().decode(plaintext);
         } catch {
