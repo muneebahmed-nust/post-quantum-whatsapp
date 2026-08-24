@@ -1,12 +1,16 @@
 {
-  "name": "post-quantum-whatsapp",
+  "name": "quanta-post-quantum-chat",
   "version": "1.0.0",
-  "description": "",
+  "description": "Real-time LAN chat application with ML-KEM-512 post-quantum key exchange and AES-256-GCM encryption",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "keywords": [],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sudo-muneeb/quanta-post-quantum-chat"
+  },
+  "keywords": ["post-quantum", "cryptography", "ml-kem", "aes-gcm", "chat", "websocket"],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
